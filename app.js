@@ -661,6 +661,10 @@
     };
   }
 
+  function getEdgeStrokeColor(edge) {
+    return sanitizeColor(edge?.style?.stroke, defaultEdgeStyle.stroke);
+  }
+
   // ===== Render =====
   // Render katmanı: modeli SVG olarak çizer.
   const Renderer = {
@@ -731,6 +735,7 @@
         shape.setAttribute("fill", fillColor);
         shape.setAttribute("stroke", strokeColor);
         shape.setAttribute("stroke-width", strokeWidth);
+        shape.setAttribute("vector-effect", "non-scaling-stroke");
         group.appendChild(shape);
       };
 
@@ -739,6 +744,7 @@
         shape.setAttribute("fill", "none");
         shape.setAttribute("stroke", strokeColor);
         shape.setAttribute("stroke-width", Math.max(1, strokeWidth * 0.8));
+        shape.setAttribute("vector-effect", "non-scaling-stroke");
         group.appendChild(shape);
       };
 
@@ -950,7 +956,7 @@
       });
     },
 
-    buildEdgeElement(edge, selected, interactive) {
+    buildEdgeElement(edge, selected, interactive, markerIdByStrokeColor = null) {
       const endpoints = getEdgeEndpoints(edge);
       if (!endpoints) {
         return null;
@@ -958,6 +964,9 @@
 
       const points = buildOrthogonalPoints(endpoints.fromPoint, endpoints.toPoint, edge.from.anchor);
       const pathData = pointsToPath(points);
+      const edgeStyle = edge.style || defaultEdgeStyle;
+      const strokeColor = getEdgeStrokeColor(edge);
+      const strokeWidth = Number(edgeStyle.strokeWidth) || defaultEdgeStyle.strokeWidth;
 
       const group = createSvgElement("g", {
         class: `edge${selected ? " selected" : ""}`,
@@ -967,12 +976,22 @@
       const path = createSvgElement("path", {
         class: "edge-path",
         d: pathData,
-        stroke: edge.style.stroke || defaultEdgeStyle.stroke,
-        "stroke-width": Number(edge.style.strokeWidth) || defaultEdgeStyle.strokeWidth,
-        "stroke-dasharray": edge.style.dashed ? "7 5" : "none"
+        stroke: strokeColor,
+        "stroke-width": strokeWidth,
+        "stroke-dasharray": edgeStyle.dashed ? "7 5" : "none",
+        "stroke-linejoin": "round",
+        "stroke-linecap": "round",
+        "vector-effect": "non-scaling-stroke"
       });
-      if (edge.style.arrow) {
-        path.setAttribute("marker-end", "url(#arrowHead)");
+      if (edgeStyle.arrow) {
+        if (markerIdByStrokeColor instanceof Map && markerIdByStrokeColor.size) {
+          const markerId = markerIdByStrokeColor.get(strokeColor.toLowerCase());
+          if (markerId) {
+            path.setAttribute("marker-end", `url(#${markerId})`);
+          }
+        } else {
+          path.setAttribute("marker-end", "url(#arrowHead)");
+        }
       }
       group.appendChild(path);
 
@@ -992,6 +1011,10 @@
           y: labelPoint.y - 6,
           "font-size": Number(edge.label.fontSize) || defaultEdgeLabel.fontSize,
           fill: edge.label.color || defaultEdgeLabel.color,
+          stroke: "#ffffff",
+          "stroke-width": 4,
+          "stroke-linejoin": "round",
+          "paint-order": "stroke",
           "text-anchor": "middle",
           "dominant-baseline": "middle"
         });
@@ -1049,21 +1072,31 @@
       });
 
       const defs = createSvgElement("defs");
-      const marker = createSvgElement("marker", {
-        id: "arrowHead",
-        markerWidth: 10,
-        markerHeight: 10,
-        refX: 9,
-        refY: 5,
-        orient: "auto",
-        markerUnits: "strokeWidth"
+      const markerIdByStrokeColor = new Map();
+      const exportArrowColors = new Set(
+        state.doc.edges
+          .filter((edge) => (edge.style || defaultEdgeStyle).arrow)
+          .map((edge) => getEdgeStrokeColor(edge).toLowerCase())
+      );
+      exportArrowColors.forEach((color, index) => {
+        const markerId = `arrowHeadExport${index + 1}`;
+        const marker = createSvgElement("marker", {
+          id: markerId,
+          markerWidth: 10,
+          markerHeight: 10,
+          refX: 9,
+          refY: 5,
+          orient: "auto",
+          markerUnits: "strokeWidth"
+        });
+        const markerPath = createSvgElement("path", {
+          d: "M0,0 L10,5 L0,10 Z",
+          fill: color
+        });
+        marker.appendChild(markerPath);
+        defs.appendChild(marker);
+        markerIdByStrokeColor.set(color, markerId);
       });
-      const markerPath = createSvgElement("path", {
-        d: "M0,0 L10,5 L0,10 Z",
-        fill: "context-stroke"
-      });
-      marker.appendChild(markerPath);
-      defs.appendChild(marker);
       svg.appendChild(defs);
 
       const background = createSvgElement("rect", {
@@ -1077,7 +1110,7 @@
 
       const edgeLayer = createSvgElement("g");
       state.doc.edges.forEach((edge) => {
-        const edgeEl = Renderer.buildEdgeElement(edge, false, false);
+        const edgeEl = Renderer.buildEdgeElement(edge, false, false, markerIdByStrokeColor);
         if (edgeEl) {
           edgeLayer.appendChild(edgeEl);
         }
@@ -1460,7 +1493,8 @@
     const ratio = Math.min(maxWidth / sourceWidth, maxHeight / sourceHeight);
     const drawWidth = sourceWidth * ratio;
     const drawHeight = sourceHeight * ratio;
-    const qualityScale = Math.max(2, Math.round((window.devicePixelRatio || 1) * 2));
+    const targetDpi = 320;
+    const qualityScale = clamp(targetDpi / 72, 3, 8);
 
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(sourceWidth * ratio * qualityScale));
@@ -1469,6 +1503,10 @@
     const ctx = canvas.getContext("2d");
     if (!ctx) {
       throw new Error("Canvas bağlamı oluşturulamadı.");
+    }
+    ctx.imageSmoothingEnabled = true;
+    if ("imageSmoothingQuality" in ctx) {
+      ctx.imageSmoothingQuality = "high";
     }
     ctx.setTransform(qualityScale * ratio, 0, 0, qualityScale * ratio, 0, 0);
     ctx.fillStyle = "#ffffff";
@@ -2586,11 +2624,14 @@
     refs.canvas.addEventListener(
       "wheel",
       (event) => {
-        if (!event.ctrlKey && !event.metaKey) {
-          return;
-        }
         event.preventDefault();
-        const factor = event.deltaY < 0 ? 1.08 : 0.92;
+        const normalizedDelta =
+          event.deltaMode === 1
+            ? event.deltaY * 16
+            : event.deltaMode === 2
+              ? event.deltaY * 100
+              : event.deltaY;
+        const factor = Math.exp(-clamp(normalizedDelta, -240, 240) * 0.0015);
         zoomAtClient(event.clientX, event.clientY, factor);
       },
       { passive: false }
