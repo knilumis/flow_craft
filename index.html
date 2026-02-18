@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="tr">
   <head>
     <meta charset="UTF-8" />
@@ -12,7 +12,7 @@
     />
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body>
+  <body data-theme="light">
     <header class="app-header" role="banner">
       <div class="brand-block">
         <p class="brand-kicker">UDK Flow Crafter :)</p>
@@ -41,6 +41,7 @@
           <button id="btnKopyala" title="Kopyala (Ctrl+C)">Kopyala</button>
           <button id="btnYapistir" title="Yapıştır (Ctrl+V)">Yapıştır</button>
           <button id="btnSil" title="Sil (Delete)">Sil</button>
+          <button id="btnGrupla" title="Seçili blokları grupla" hidden>Grupla</button>
         </div>
 
         <div class="toolbar-group" aria-label="Görünüm">
@@ -50,6 +51,7 @@
           <button id="btnZoomIn" title="Yakınlaştır">+</button>
           <button id="btnZoomOut" title="Uzaklaştır">-</button>
           <button id="btnZoomReset" title="Yakınlaştırmayı sıfırla">Sıfırla</button>
+          <button id="btnTema" title="Açık/Koyu mod değiştir">Koyu Mod</button>
           <span id="zoomSeviye" class="zoom-badge">%100</span>
         </div>
 
@@ -123,11 +125,14 @@
 
           <g id="viewport">
             <rect id="gridRect" x="-20000" y="-20000" width="40000" height="40000" fill="url(#gridPattern)"></rect>
+            <g id="pageLayer"></g>
             <g id="edgeLayer"></g>
+            <g id="groupLayer"></g>
             <g id="nodeLayer"></g>
             <g id="overlayLayer"></g>
           </g>
         </svg>
+        <div id="quickPalette" class="quick-palette" hidden></div>
       </section>
 
       <aside class="right-panel" aria-label="Özellikler paneli">
@@ -138,7 +143,7 @@
           <section id="blokOzellikleri" class="props-section" hidden>
             <h3>Blok</h3>
             <label>Metin
-              <textarea id="propMetin" rows="3"></textarea>
+              <textarea id="propMetin" rows="3" placeholder="Normal metin veya LaTeX: $x^2 + y^2 = z^2$"></textarea>
             </label>
 
             <div class="inline-grid">
@@ -219,6 +224,23 @@
               <label><input id="propEdgeArrow" type="checkbox" /> Ok</label>
             </div>
 
+            <div class="inline-grid">
+              <label>Çizgi Tipi
+                <select id="propEdgeType">
+                  <option value="orthogonal">Ortogonal</option>
+                  <option value="straight">Düz</option>
+                  <option value="curved">Eğri</option>
+                </select>
+              </label>
+              <label>Köşe Yuvarlama
+                <input id="propEdgeCornerRadius" type="number" min="0" max="60" step="1" />
+              </label>
+            </div>
+
+            <div class="hint edge-hint">
+              Seçili bağlantının ortasındaki tutamacı sürükleyerek çizgiyi hareket ettirebilirsiniz.
+            </div>
+
             <label>Etiket
               <input id="propEdgeLabel" type="text" />
             </label>
@@ -241,6 +263,15 @@
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/svg2pdf.js@2.2.4/dist/svg2pdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvg@3.0.10/lib/umd.min.js"></script>
+    <script>
+      window.MathJax = {
+        loader: { load: ["input/tex", "output/svg"] },
+        svg: { fontCache: "none" }
+      };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
+
+
