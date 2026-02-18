@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FlowCraft TR | Flow Chart Editörü</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="app-header" role="banner">
+      <div class="brand-block">
+        <p class="brand-kicker">FlowCraft TR</p>
+        <h1>Flow Chart Editörü</h1>
+      </div>
+
+      <div class="toolbar" aria-label="Araç Çubuğu">
+        <div class="toolbar-group" aria-label="Dosya">
+          <span class="group-title">Dosya</span>
+          <button id="btnYeni" title="Yeni diyagram oluştur">Yeni</button>
+          <button id="btnAc" title="XML dosyası aç">Aç (XML)</button>
+          <button id="btnKaydet" title="XML olarak indir">Kaydet (XML)</button>
+          <button id="btnPdf" title="PDF dışa aktar">PDF Dışa Aktar</button>
+          <label class="inline-label" for="pdfYon">Yön</label>
+          <select id="pdfYon" title="PDF yönü">
+            <option value="landscape">Yatay</option>
+            <option value="portrait">Dikey</option>
+          </select>
+          <input id="xmlDosyaInput" type="file" accept=".xml,text/xml" hidden />
+        </div>
+
+        <div class="toolbar-group" aria-label="Düzen">
+          <span class="group-title">Düzen</span>
+          <button id="btnGeriAl" title="Geri Al (Ctrl+Z)">Geri Al</button>
+          <button id="btnYinele" title="Yinele (Ctrl+Y)">Yinele</button>
+          <button id="btnKopyala" title="Kopyala (Ctrl+C)">Kopyala</button>
+          <button id="btnYapistir" title="Yapıştır (Ctrl+V)">Yapıştır</button>
+          <button id="btnSil" title="Sil (Delete)">Sil</button>
+        </div>
+
+        <div class="toolbar-group" aria-label="Görünüm">
+          <span class="group-title">Görünüm</span>
+          <button id="btnIzgara" data-active="1" title="Izgarayı göster/gizle">Izgara</button>
+          <button id="btnSnap" data-active="0" title="Izgaraya yapış">Yapış</button>
+          <button id="btnZoomIn" title="Yakınlaştır">+</button>
+          <button id="btnZoomOut" title="Uzaklaştır">-</button>
+          <button id="btnZoomReset" title="Yakınlaştırmayı sıfırla">Sıfırla</button>
+          <span id="zoomSeviye" class="zoom-badge">%100</span>
+        </div>
+
+        <div class="toolbar-group" aria-label="Hizalama">
+          <span class="group-title">Hizala</span>
+          <button data-align="left" title="Sola hizala">Sol</button>
+          <button data-align="center" title="Yatay ortala">Ort</button>
+          <button data-align="right" title="Sağa hizala">Sağ</button>
+          <button data-align="top" title="Üste hizala">Üst</button>
+          <button data-align="middle" title="Dikey ortala">Merkez</button>
+          <button data-align="bottom" title="Alta hizala">Alt</button>
+          <button data-distribute="horizontal" title="Yatay dağıt">Yatay Dağıt</button>
+          <button data-distribute="vertical" title="Dikey dağıt">Dikey Dağıt</button>
+          <button id="btnOneGetir" title="Öne getir">Öne</button>
+          <button id="btnArkayaGonder" title="Arkaya gönder">Arkaya</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="left-panel" aria-label="Şekiller paneli">
+        <section class="panel-card">
+          <h2>Şekil Kütüphanesi</h2>
+          <p class="panel-subtitle">Draw.io tarzı akış blokları ve yeni elemanlar.</p>
+
+          <h3>Temel Akış</h3>
+          <div class="shape-grid">
+            <button class="shape-btn" data-add-shape="dikdortgen"><span>[ ]</span> Dikdörtgen</button>
+            <button class="shape-btn" data-add-shape="yuvarlatilmis"><span>( )</span> Yuvarlatılmış</button>
+            <button class="shape-btn" data-add-shape="oval"><span>(O)</span> Oval</button>
+            <button class="shape-btn" data-add-shape="elmas"><span>&lt;&gt;</span> Elmas</button>
+            <button class="shape-btn" data-add-shape="altSurec"><span>[||]</span> Alt Süreç</button>
+          </div>
+
+          <h3>Veri ve Belge</h3>
+          <div class="shape-grid">
+            <button class="shape-btn" data-add-shape="paralelkenar"><span>[/]</span> Paralelkenar</button>
+            <button class="shape-btn" data-add-shape="silindir"><span>(DB)</span> Silindir</button>
+            <button class="shape-btn" data-add-shape="belge"><span>[DOC]</span> Belge</button>
+            <button class="shape-btn" data-add-shape="not"><span>[!]</span> Not</button>
+          </div>
+        </section>
+
+        <section class="panel-card plugin-card">
+          <h2>Eklentiler</h2>
+          <p class="panel-subtitle">Yeni yardımcı araçlar.</p>
+          <button id="btnEklentiTema" class="plugin-btn" title="Seçili bloklara tema uygula">Tema Uygula</button>
+          <button id="btnEklentiAkis" class="plugin-btn" title="Akışı otomatik hizala">Akışı Otomatik Diz</button>
+          <button id="btnEklentiNot" class="plugin-btn" title="Hızlı not ekle">Hızlı Not Ekle</button>
+        </section>
+      </aside>
+
+      <section class="workspace" aria-label="Çalışma alanı">
+        <svg id="canvas" xmlns="http://www.w3.org/2000/svg" aria-label="Flow chart çizim alanı">
+          <defs>
+            <pattern id="gridPattern" width="10" height="10" patternUnits="userSpaceOnUse">
+              <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#dbe4ec" stroke-width="1" />
+            </pattern>
+            <marker
+              id="arrowHead"
+              markerWidth="10"
+              markerHeight="10"
+              refX="9"
+              refY="5"
+              orient="auto"
+              markerUnits="strokeWidth"
+            >
+              <path d="M0,0 L10,5 L0,10 Z" fill="context-stroke" />
+            </marker>
+          </defs>
+
+          <g id="viewport">
+            <rect id="gridRect" x="-20000" y="-20000" width="40000" height="40000" fill="url(#gridPattern)"></rect>
+            <g id="edgeLayer"></g>
+            <g id="nodeLayer"></g>
+            <g id="overlayLayer"></g>
+          </g>
+        </svg>
+      </section>
+
+      <aside class="right-panel" aria-label="Özellikler paneli">
+        <section class="panel-card">
+          <h2>Özellikler</h2>
+          <div id="secimBilgi" class="hint">Bir öğe seçin.</div>
+
+          <section id="blokOzellikleri" class="props-section" hidden>
+            <h3>Blok</h3>
+            <label>Metin
+              <textarea id="propMetin" rows="3"></textarea>
+            </label>
+
+            <div class="inline-grid">
+              <label>Yazı Tipi
+                <select id="propFontFamily">
+                  <option>Arial</option>
+                  <option>Verdana</option>
+                  <option>Georgia</option>
+                  <option>Tahoma</option>
+                  <option>Courier New</option>
+                </select>
+              </label>
+              <label>Yazı Boyutu
+                <input id="propFontSize" type="number" min="8" max="72" step="1" />
+              </label>
+            </div>
+
+            <div class="inline-grid">
+              <label>Yazı Rengi
+                <input id="propTextColor" type="color" />
+              </label>
+              <label>Yazı Hizası
+                <select id="propTextAlign">
+                  <option value="left">Sol</option>
+                  <option value="center">Orta</option>
+                  <option value="right">Sağ</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="inline-grid checks">
+              <label><input id="propBold" type="checkbox" /> Kalın</label>
+              <label><input id="propItalic" type="checkbox" /> İtalik</label>
+            </div>
+
+            <div class="inline-grid">
+              <label>Dolgu
+                <input id="propFill" type="color" />
+              </label>
+              <label>Kenar
+                <input id="propStroke" type="color" />
+              </label>
+            </div>
+
+            <div class="inline-grid">
+              <label>Kenar Kalınlığı
+                <input id="propStrokeWidth" type="number" min="1" max="20" step="1" />
+              </label>
+              <label>Köşe Yuvarlaklığı
+                <input id="propRadius" type="number" min="0" max="80" step="1" />
+              </label>
+            </div>
+
+            <div class="inline-grid">
+              <label>Genişlik
+                <input id="propW" type="number" min="30" max="1200" step="1" />
+              </label>
+              <label>Yükseklik
+                <input id="propH" type="number" min="30" max="1200" step="1" />
+              </label>
+            </div>
+          </section>
+
+          <section id="baglantiOzellikleri" class="props-section" hidden>
+            <h3>Bağlantı</h3>
+
+            <div class="inline-grid">
+              <label>Çizgi Rengi
+                <input id="propEdgeStroke" type="color" />
+              </label>
+              <label>Kalınlık
+                <input id="propEdgeStrokeWidth" type="number" min="1" max="12" step="1" />
+              </label>
+            </div>
+
+            <div class="inline-grid checks">
+              <label><input id="propEdgeDashed" type="checkbox" /> Kesikli</label>
+              <label><input id="propEdgeArrow" type="checkbox" /> Ok</label>
+            </div>
+
+            <label>Etiket
+              <input id="propEdgeLabel" type="text" />
+            </label>
+
+            <div class="inline-grid">
+              <label>Etiket Boyutu
+                <input id="propEdgeLabelSize" type="number" min="8" max="40" step="1" />
+              </label>
+              <label>Etiket Rengi
+                <input id="propEdgeLabelColor" type="color" />
+              </label>
+            </div>
+          </section>
+        </section>
+      </aside>
+    </main>
+
+    <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/svg2pdf.js@2.2.4/dist/svg2pdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvg@3.0.10/lib/umd.min.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
