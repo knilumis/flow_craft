@@ -15,6 +15,11 @@
   const GROUP_COLLAPSED_MIN_H = 30;
   const GROUP_PADDING = 20;
   const ANCHORS = ["top", "right", "bottom", "left"];
+  const EDGE_ROUTE_TYPES = ["straight", "orthogonal", "isometric", "curved", "simple", "entityRelation"];
+  const EDGE_CORNER_TYPES = ["sharp", "rounded", "curved"];
+  const EDGE_ARROW_TYPES = ["none", "classic", "block", "open", "oval", "diamond"];
+  const EDGE_PATTERN_TYPES = ["solid", "dashed", "dotted"];
+  const EDGE_JUMP_TYPES = ["none", "arc", "gap", "sharp"];
   const SUPPORTED_NODE_TYPES = [
     "dikdortgen",
     "yuvarlatilmis",
@@ -24,7 +29,8 @@
     "silindir",
     "belge",
     "altSurec",
-    "not"
+    "not",
+    "junction"
   ];
 
   const THEME_PRESETS = [
@@ -110,15 +116,47 @@
     propW: document.getElementById("propW"),
     propH: document.getElementById("propH"),
 
+    propEdgeRoute: document.getElementById("propEdgeRoute"),
+    propEdgeCornerStyle: document.getElementById("propEdgeCornerStyle"),
+    propEdgeCornerRadius: document.getElementById("propEdgeCornerRadius"),
+    propEdgeEndpointMode: document.getElementById("propEdgeEndpointMode"),
+    propEdgeSnapRouting: document.getElementById("propEdgeSnapRouting"),
     propEdgeStroke: document.getElementById("propEdgeStroke"),
     propEdgeStrokeWidth: document.getElementById("propEdgeStrokeWidth"),
-    propEdgeDashed: document.getElementById("propEdgeDashed"),
-    propEdgeArrow: document.getElementById("propEdgeArrow"),
-    propEdgeType: document.getElementById("propEdgeType"),
-    propEdgeCornerRadius: document.getElementById("propEdgeCornerRadius"),
+    propEdgePattern: document.getElementById("propEdgePattern"),
+    propEdgeOpacity: document.getElementById("propEdgeOpacity"),
+    propEdgeDashLength: document.getElementById("propEdgeDashLength"),
+    propEdgeGapLength: document.getElementById("propEdgeGapLength"),
+    propEdgeShadow: document.getElementById("propEdgeShadow"),
+    propEdgeSketch: document.getElementById("propEdgeSketch"),
+    propEdgeStartArrow: document.getElementById("propEdgeStartArrow"),
+    propEdgeEndArrow: document.getElementById("propEdgeEndArrow"),
+    propEdgeStartSize: document.getElementById("propEdgeStartSize"),
+    propEdgeEndSize: document.getElementById("propEdgeEndSize"),
+    propEdgeStartSpacing: document.getElementById("propEdgeStartSpacing"),
+    propEdgeEndSpacing: document.getElementById("propEdgeEndSpacing"),
+    propEdgeArrowFill: document.getElementById("propEdgeArrowFill"),
+    propEdgeJumpStyle: document.getElementById("propEdgeJumpStyle"),
+    propEdgeJumpSize: document.getElementById("propEdgeJumpSize"),
     propEdgeLabel: document.getElementById("propEdgeLabel"),
+    propEdgeLabelPosition: document.getElementById("propEdgeLabelPosition"),
+    propEdgeLabelOffsetX: document.getElementById("propEdgeLabelOffsetX"),
+    propEdgeLabelOffsetY: document.getElementById("propEdgeLabelOffsetY"),
+    propEdgeLabelFontFamily: document.getElementById("propEdgeLabelFontFamily"),
     propEdgeLabelSize: document.getElementById("propEdgeLabelSize"),
-    propEdgeLabelColor: document.getElementById("propEdgeLabelColor")
+    propEdgeLabelColor: document.getElementById("propEdgeLabelColor"),
+    propEdgeLabelBold: document.getElementById("propEdgeLabelBold"),
+    propEdgeLabelItalic: document.getElementById("propEdgeLabelItalic"),
+    propEdgeLabelUnderline: document.getElementById("propEdgeLabelUnderline"),
+    propEdgeLabelAlign: document.getElementById("propEdgeLabelAlign"),
+    propEdgeLabelBackground: document.getElementById("propEdgeLabelBackground"),
+    propEdgeLabelBorder: document.getElementById("propEdgeLabelBorder"),
+    propEdgeLabelBorderWidth: document.getElementById("propEdgeLabelBorderWidth"),
+    propEdgeLabelPadding: document.getElementById("propEdgeLabelPadding"),
+    propEdgeFlowEnabled: document.getElementById("propEdgeFlowEnabled"),
+    propEdgeFlowSpeed: document.getElementById("propEdgeFlowSpeed"),
+    propEdgeFlowDirection: document.getElementById("propEdgeFlowDirection"),
+    edgeContextMenu: document.getElementById("edgeContextMenu")
   };
 
   if (!refs.canvas) {
@@ -144,24 +182,54 @@
   const defaultEdgeStyle = {
     stroke: "#334155",
     strokeWidth: 2,
-    dashed: false,
-    arrow: true
+    pattern: "solid",
+    opacity: 1,
+    dashLength: 8,
+    gapLength: 6,
+    shadow: false,
+    sketch: false,
+    cornerStyle: "sharp",
+    startArrow: "none",
+    endArrow: "block",
+    startSize: 10,
+    endSize: 10,
+    startSpacing: 0,
+    endSpacing: 0,
+    arrowFill: true,
+    jumpStyle: "none",
+    jumpSize: 10,
+    flowEnabled: false,
+    flowSpeed: 4,
+    flowDirection: "forward"
   };
 
   const defaultEdgeRoute = {
     type: "orthogonal",
+    snapToGrid: true,
     cornerRadius: 0,
     bend: null,
     controlX: null,
-    controlY: null
+    controlY: null,
+    waypoints: []
   };
 
   const defaultEdgeLabel = {
     text: "",
+    position: 0.5,
+    normalOffset: -6,
+    offsetX: 0,
+    offsetY: 0,
+    fontFamily: "Arial",
     fontSize: 10,
     color: "#111111",
-    offsetX: 0,
-    offsetY: 0
+    bold: false,
+    italic: false,
+    underline: false,
+    align: "center",
+    backgroundColor: "#ffffff",
+    borderColor: "#111111",
+    borderWidth: 0,
+    padding: 3
   };
 
   let idCounter = 1;
@@ -170,8 +238,15 @@
   const state = {
     doc: createSampleDocument(),
     selectedNodeIds: new Set(),
+    selectedEdgeIds: new Set(),
     selectedEdgeId: null,
     selectedGroupId: null,
+    defaultConnectorStyle: {
+      style: cloneDeep(defaultEdgeStyle),
+      route: cloneDeep(defaultEdgeRoute),
+      label: cloneDeep(defaultEdgeLabel)
+    },
+    edgeStyleClipboard: null,
     ui: {
       showGrid: true,
       snapToGrid: true,
@@ -216,8 +291,14 @@
       edgeHandle: null,
       edgeEndpoint: null,
       edgeLabel: null,
+      edgeWaypoint: null,
       connectFrom: null,
       marqueeAdditive: false
+    },
+    contextMenu: {
+      edgeId: null,
+      waypointIndex: -1,
+      worldPoint: null
     },
     rafPending: false,
     panelSync: false
@@ -300,7 +381,136 @@
   }
 
   function normalizeEdgeType(value) {
-    return ["orthogonal", "straight", "curved"].includes(value) ? value : "orthogonal";
+    return EDGE_ROUTE_TYPES.includes(value) ? value : "orthogonal";
+  }
+
+  function normalizeEdgeCornerStyle(value) {
+    return EDGE_CORNER_TYPES.includes(value) ? value : "sharp";
+  }
+
+  function normalizeEdgePattern(value) {
+    return EDGE_PATTERN_TYPES.includes(value) ? value : "solid";
+  }
+
+  function normalizeEdgeArrow(value) {
+    return EDGE_ARROW_TYPES.includes(value) ? value : "none";
+  }
+
+  function normalizeEdgeJump(value) {
+    return EDGE_JUMP_TYPES.includes(value) ? value : "none";
+  }
+
+  function normalizeEdgeFlowDirection(value) {
+    return value === "backward" ? "backward" : "forward";
+  }
+
+  function normalizeWaypoints(points) {
+    if (!Array.isArray(points)) {
+      return [];
+    }
+    return points
+      .map((point) => ({
+        x: Number(point?.x),
+        y: Number(point?.y)
+      }))
+      .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
+      .map((point) => ({
+        x: snapAlways(point.x),
+        y: snapAlways(point.y)
+      }));
+  }
+
+  function normalizeEdgeStyle(style) {
+    const strokeWidthRaw = Number(style?.strokeWidth);
+    const opacityRaw = Number(style?.opacity);
+    const dashLengthRaw = Number(style?.dashLength);
+    const gapLengthRaw = Number(style?.gapLength);
+    const startSizeRaw = Number(style?.startSize);
+    const endSizeRaw = Number(style?.endSize);
+    const startSpacingRaw = Number(style?.startSpacing);
+    const endSpacingRaw = Number(style?.endSpacing);
+    const jumpSizeRaw = Number(style?.jumpSize);
+    const flowSpeedRaw = Number(style?.flowSpeed);
+    const normalized = {
+      stroke: sanitizeColor(style?.stroke, defaultEdgeStyle.stroke),
+      strokeWidth: clamp(Number.isFinite(strokeWidthRaw) ? strokeWidthRaw : defaultEdgeStyle.strokeWidth, 1, 20),
+      pattern: normalizeEdgePattern(style?.pattern),
+      opacity: clamp(Number.isFinite(opacityRaw) ? opacityRaw : defaultEdgeStyle.opacity, 0, 1),
+      dashLength: clamp(Number.isFinite(dashLengthRaw) ? dashLengthRaw : defaultEdgeStyle.dashLength, 1, 40),
+      gapLength: clamp(Number.isFinite(gapLengthRaw) ? gapLengthRaw : defaultEdgeStyle.gapLength, 1, 40),
+      shadow: Boolean(style?.shadow),
+      sketch: Boolean(style?.sketch),
+      cornerStyle: normalizeEdgeCornerStyle(style?.cornerStyle),
+      startArrow: normalizeEdgeArrow(style?.startArrow),
+      endArrow: normalizeEdgeArrow(style?.endArrow),
+      startSize: clamp(Number.isFinite(startSizeRaw) ? startSizeRaw : defaultEdgeStyle.startSize, 4, 48),
+      endSize: clamp(Number.isFinite(endSizeRaw) ? endSizeRaw : defaultEdgeStyle.endSize, 4, 48),
+      startSpacing: clamp(Number.isFinite(startSpacingRaw) ? startSpacingRaw : 0, -40, 40),
+      endSpacing: clamp(Number.isFinite(endSpacingRaw) ? endSpacingRaw : 0, -40, 40),
+      arrowFill: style?.arrowFill !== false,
+      jumpStyle: normalizeEdgeJump(style?.jumpStyle),
+      jumpSize: clamp(Number.isFinite(jumpSizeRaw) ? jumpSizeRaw : defaultEdgeStyle.jumpSize, 2, 40),
+      flowEnabled: Boolean(style?.flowEnabled),
+      flowSpeed: clamp(Number.isFinite(flowSpeedRaw) ? flowSpeedRaw : defaultEdgeStyle.flowSpeed, 1, 10),
+      flowDirection: normalizeEdgeFlowDirection(style?.flowDirection)
+    };
+
+    // Eski XML uyumluluğu: dashed/arrow alanlarını yeni modele dönüştür.
+    if (Boolean(style?.dashed)) {
+      normalized.pattern = "dashed";
+    }
+    if (style?.arrow === false) {
+      normalized.endArrow = "none";
+    } else if (style?.arrow === true && (!style?.endArrow || style?.endArrow === "none")) {
+      normalized.endArrow = "block";
+    }
+
+    return normalized;
+  }
+
+  function normalizeEdgeLabel(label) {
+    const positionRaw = Number(label?.position);
+    const offsetXRaw = Number(label?.offsetX);
+    const offsetYRaw = Number(label?.offsetY);
+    const fontSizeRaw = Number(label?.fontSize);
+    const borderWidthRaw = Number(label?.borderWidth);
+    const paddingRaw = Number(label?.padding);
+    return {
+      text: typeof label?.text === "string" ? label.text : "",
+      position: clamp(Number.isFinite(positionRaw) ? positionRaw : defaultEdgeLabel.position, 0, 1),
+      normalOffset: Number.isFinite(Number(label?.normalOffset)) ? Number(label.normalOffset) : defaultEdgeLabel.normalOffset,
+      offsetX: Number.isFinite(offsetXRaw) ? offsetXRaw : 0,
+      offsetY: Number.isFinite(offsetYRaw) ? offsetYRaw : 0,
+      fontFamily: String(label?.fontFamily || defaultEdgeLabel.fontFamily),
+      fontSize: clamp(Number.isFinite(fontSizeRaw) ? fontSizeRaw : defaultEdgeLabel.fontSize, 8, 48),
+      color: sanitizeColor(label?.color, defaultEdgeLabel.color),
+      bold: Boolean(label?.bold),
+      italic: Boolean(label?.italic),
+      underline: Boolean(label?.underline),
+      align: ["left", "center", "right"].includes(label?.align) ? label.align : defaultEdgeLabel.align,
+      backgroundColor: sanitizeColor(label?.backgroundColor, defaultEdgeLabel.backgroundColor),
+      borderColor: sanitizeColor(label?.borderColor, defaultEdgeLabel.borderColor),
+      borderWidth: clamp(Number.isFinite(borderWidthRaw) ? borderWidthRaw : 0, 0, 10),
+      padding: clamp(Number.isFinite(paddingRaw) ? paddingRaw : defaultEdgeLabel.padding, 0, 24)
+    };
+  }
+
+  function normalizeEdgeEndpoint(end, fallbackAnchor) {
+    const pointX = Number(end?.point?.x);
+    const pointY = Number(end?.point?.y);
+    const hasPoint = Number.isFinite(pointX) && Number.isFinite(pointY);
+    return {
+      nodeId: end?.nodeId || null,
+      anchor: normalizeAnchor(end?.anchor || fallbackAnchor),
+      mode: end?.mode === "fixed" ? "fixed" : "floating",
+      point: hasPoint
+        ? {
+            x: snapAlways(pointX),
+            y: snapAlways(pointY)
+          }
+        : null,
+      customPointId: end?.customPointId || null
+    };
   }
 
   function normalizeEdgeRoute(route) {
@@ -309,10 +519,12 @@
     const controlYRaw = Number(route?.controlY);
     return {
       type: normalizeEdgeType(route?.type),
-      cornerRadius: clamp(Number(route?.cornerRadius) || 0, 0, 60),
+      snapToGrid: route?.snapToGrid !== false,
+      cornerRadius: clamp(Number(route?.cornerRadius) || 0, 0, 80),
       bend: Number.isFinite(bendRaw) ? snapAlways(bendRaw) : null,
       controlX: Number.isFinite(controlXRaw) ? snapAlways(controlXRaw) : null,
-      controlY: Number.isFinite(controlYRaw) ? snapAlways(controlYRaw) : null
+      controlY: Number.isFinite(controlYRaw) ? snapAlways(controlYRaw) : null,
+      waypoints: normalizeWaypoints(route?.waypoints)
     };
   }
 
@@ -340,7 +552,8 @@
       silindir: "Silindir",
       belge: "Belge",
       altSurec: "Alt Süreç",
-      not: "Not"
+      not: "Not",
+      junction: "Bağlantı Noktası"
     };
     return labels[type] || type;
   }
@@ -355,7 +568,8 @@
       silindir: "(DB)",
       belge: "[DOC]",
       altSurec: "[||]",
-      not: "[!]"
+      not: "[!]",
+      junction: "(•)"
     };
     return symbols[type] || "[ ]";
   }
@@ -501,7 +715,8 @@
       silindir: { w: 104, h: 62 },
       belge: { w: 104, h: 54 },
       altSurec: { w: 110, h: 50 },
-      not: { w: 96, h: 50 }
+      not: { w: 96, h: 50 },
+      junction: { w: 18, h: 18 }
     }[type] || { w: 96, h: 44 };
 
     const label = {
@@ -510,7 +725,8 @@
       silindir: "Veritabanı",
       belge: "Belge",
       altSurec: "Alt Süreç",
-      not: "Not"
+      not: "Not",
+      junction: ""
     }[type] || "Yeni Blok";
 
     const shapeStyle = cloneDeep(defaultShapeStyle);
@@ -520,6 +736,12 @@
     if (type === "not") {
       shapeStyle.fill = "#FFF7CC";
       shapeStyle.stroke = "#A16207";
+    }
+    if (type === "junction") {
+      shapeStyle.fill = "#0f766e";
+      shapeStyle.stroke = "#0f172a";
+      shapeStyle.strokeWidth = 1.6;
+      shapeStyle.radius = 999;
     }
 
     return {
@@ -539,9 +761,9 @@
   function createEdge(fromNodeId, fromAnchor, toNodeId, toAnchor, id = generateId("e")) {
     return {
       id,
-      from: { nodeId: fromNodeId || null, anchor: normalizeAnchor(fromAnchor), point: null },
-      to: { nodeId: toNodeId || null, anchor: normalizeAnchor(toAnchor), point: null },
-      style: cloneDeep(defaultEdgeStyle),
+      from: { nodeId: fromNodeId || null, anchor: normalizeAnchor(fromAnchor), mode: "floating", point: null, customPointId: null },
+      to: { nodeId: toNodeId || null, anchor: normalizeAnchor(toAnchor), mode: "floating", point: null, customPointId: null },
+      style: normalizeEdgeStyle(defaultEdgeStyle),
       route: cloneDeep(defaultEdgeRoute),
       label: cloneDeep(defaultEdgeLabel)
     };
@@ -599,6 +821,38 @@
     doc.nodes.push(n1, n2, n3, n4);
     doc.edges.push(e1, e2, e3, e4);
     return doc;
+  }
+
+  function applyDefaultConnectorStyle(edge) {
+    if (!edge) {
+      return;
+    }
+    const defaults = state?.defaultConnectorStyle || {
+      style: defaultEdgeStyle,
+      route: defaultEdgeRoute,
+      label: defaultEdgeLabel
+    };
+    const previousLabelText = edge.label?.text || "";
+    edge.style = normalizeEdgeStyle(cloneDeep(defaults.style));
+    edge.route = normalizeEdgeRoute(cloneDeep(defaults.route));
+    edge.label = normalizeEdgeLabel(cloneDeep(defaults.label));
+    if (!edge.label.text) {
+      edge.label.text = previousLabelText;
+    }
+    edge.from = normalizeEdgeEndpoint(edge.from, "right");
+    edge.to = normalizeEdgeEndpoint(edge.to, "left");
+  }
+
+  function ensureEdgeDefaults(edge) {
+    if (!edge || typeof edge !== "object") {
+      return null;
+    }
+    edge.from = normalizeEdgeEndpoint(edge.from, "right");
+    edge.to = normalizeEdgeEndpoint(edge.to, "left");
+    edge.style = normalizeEdgeStyle(edge.style);
+    edge.route = normalizeEdgeRoute(edge.route);
+    edge.label = normalizeEdgeLabel(edge.label);
+    return edge;
   }
 
   // ===== Model =====
@@ -782,8 +1036,19 @@
     });
     state.selectedNodeIds = nextSelection;
 
-    if (state.selectedEdgeId && !getEdgeById(state.selectedEdgeId)) {
+    const edgeIdSet = new Set(state.doc.edges.map((edge) => edge.id));
+    const nextEdges = new Set();
+    state.selectedEdgeIds.forEach((edgeId) => {
+      if (edgeIdSet.has(edgeId)) {
+        nextEdges.add(edgeId);
+      }
+    });
+    state.selectedEdgeIds = nextEdges;
+    if (state.selectedEdgeId && !nextEdges.has(state.selectedEdgeId)) {
       state.selectedEdgeId = null;
+    }
+    if (!state.selectedEdgeId && state.selectedEdgeIds.size) {
+      state.selectedEdgeId = [...state.selectedEdgeIds][0];
     }
     if (state.selectedGroupId && !getGroupById(state.selectedGroupId)) {
       state.selectedGroupId = null;
@@ -792,18 +1057,22 @@
 
   function clearSelection() {
     state.selectedNodeIds.clear();
+    state.selectedEdgeIds.clear();
     state.selectedEdgeId = null;
     state.selectedGroupId = null;
     closeQuickPalette();
+    hideEdgeContextMenu();
   }
 
   function selectSingleNode(nodeId) {
     state.selectedNodeIds = new Set([nodeId]);
+    state.selectedEdgeIds.clear();
     state.selectedEdgeId = null;
     state.selectedGroupId = null;
   }
 
   function toggleNodeSelection(nodeId) {
+    state.selectedEdgeIds.clear();
     state.selectedEdgeId = null;
     state.selectedGroupId = null;
     if (state.selectedNodeIds.has(nodeId)) {
@@ -818,9 +1087,27 @@
 
   function selectSingleEdge(edgeId) {
     state.selectedNodeIds.clear();
+    state.selectedEdgeIds = new Set([edgeId]);
     state.selectedEdgeId = edgeId;
     state.selectedGroupId = null;
     closeQuickPalette();
+    hideEdgeContextMenu();
+  }
+
+  function toggleEdgeSelection(edgeId) {
+    state.selectedNodeIds.clear();
+    state.selectedGroupId = null;
+    if (state.selectedEdgeIds.has(edgeId)) {
+      state.selectedEdgeIds.delete(edgeId);
+      if (state.selectedEdgeId === edgeId) {
+        state.selectedEdgeId = state.selectedEdgeIds.size ? [...state.selectedEdgeIds][0] : null;
+      }
+    } else {
+      state.selectedEdgeIds.add(edgeId);
+      state.selectedEdgeId = edgeId;
+    }
+    closeQuickPalette();
+    hideEdgeContextMenu();
   }
 
   // ===== History =====
@@ -1001,18 +1288,18 @@
     return result;
   }
 
-  function buildOrthogonalPoints(startPoint, endPoint, startAnchor, bend = null) {
+  function buildOrthogonalPoints(startPoint, endPoint, startAnchor, bend = null, snapRouting = true) {
     const horizontalStart = startAnchor === "left" || startAnchor === "right";
     const points = [startPoint];
 
     if (horizontalStart) {
       const rawMidX = Number.isFinite(Number(bend)) ? Number(bend) : (startPoint.x + endPoint.x) / 2;
-      const midX = snapAlways(rawMidX);
+      const midX = snapRouting ? snapAlways(rawMidX) : rawMidX;
       points.push({ x: midX, y: startPoint.y });
       points.push({ x: midX, y: endPoint.y });
     } else {
       const rawMidY = Number.isFinite(Number(bend)) ? Number(bend) : (startPoint.y + endPoint.y) / 2;
-      const midY = snapAlways(rawMidY);
+      const midY = snapRouting ? snapAlways(rawMidY) : rawMidY;
       points.push({ x: startPoint.x, y: midY });
       points.push({ x: endPoint.x, y: midY });
     }
@@ -1069,6 +1356,127 @@
     return pathData;
   }
 
+  function pointsToCurvedPath(points) {
+    const safePoints = removeDuplicatePoints(points);
+    if (safePoints.length <= 2) {
+      return pointsToPath(safePoints);
+    }
+    let pathData = `M ${safePoints[0].x} ${safePoints[0].y}`;
+    for (let i = 1; i < safePoints.length - 1; i += 1) {
+      const current = safePoints[i];
+      const next = safePoints[i + 1];
+      const mid = {
+        x: (current.x + next.x) / 2,
+        y: (current.y + next.y) / 2
+      };
+      pathData += ` Q ${current.x} ${current.y} ${mid.x} ${mid.y}`;
+    }
+    const last = safePoints[safePoints.length - 1];
+    pathData += ` T ${last.x} ${last.y}`;
+    return pathData;
+  }
+
+  function pointsToSketchPath(points, jitterAmount = 1.2) {
+    const safe = removeDuplicatePoints(points);
+    if (safe.length < 2) {
+      return pointsToPath(safe);
+    }
+    const jittered = safe.map((point, index) => {
+      if (index === 0 || index === safe.length - 1) {
+        return point;
+      }
+      const seed = (index * 131) % 17;
+      return {
+        x: point.x + ((seed % 3) - 1) * jitterAmount,
+        y: point.y + (((seed + 1) % 3) - 1) * jitterAmount
+      };
+    });
+    return pointsToPath(jittered);
+  }
+
+  function pointDistanceToSegment(point, a, b) {
+    const abX = b.x - a.x;
+    const abY = b.y - a.y;
+    const abLengthSq = abX * abX + abY * abY;
+    if (abLengthSq < 0.0001) {
+      return Math.hypot(point.x - a.x, point.y - a.y);
+    }
+    const tRaw = ((point.x - a.x) * abX + (point.y - a.y) * abY) / abLengthSq;
+    const t = clamp(tRaw, 0, 1);
+    const proj = {
+      x: a.x + abX * t,
+      y: a.y + abY * t
+    };
+    return Math.hypot(point.x - proj.x, point.y - proj.y);
+  }
+
+  function findClosestSegmentIndex(points, worldPoint) {
+    if (!Array.isArray(points) || points.length < 2) {
+      return 0;
+    }
+    let bestIndex = 0;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < points.length - 1; i += 1) {
+      const distance = pointDistanceToSegment(worldPoint, points[i], points[i + 1]);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestIndex = i;
+      }
+    }
+    return bestIndex;
+  }
+
+  function getSegmentsFromPoints(points, edgeId) {
+    const segments = [];
+    if (!Array.isArray(points) || points.length < 2) {
+      return segments;
+    }
+    for (let i = 0; i < points.length - 1; i += 1) {
+      segments.push({
+        edgeId,
+        index: i,
+        a: points[i],
+        b: points[i + 1]
+      });
+    }
+    return segments;
+  }
+
+  function buildIsometricPoints(startPoint, endPoint, snapRouting = true) {
+    const dx = endPoint.x - startPoint.x;
+    const dy = endPoint.y - startPoint.y;
+    const half = Math.max(Math.abs(dx), Math.abs(dy)) / 2;
+    const stepX = dx === 0 ? 0 : Math.sign(dx) * half;
+    const stepY = dy === 0 ? 0 : Math.sign(dy) * half;
+    const midA = {
+      x: startPoint.x + stepX,
+      y: startPoint.y + stepY
+    };
+    const midB = {
+      x: endPoint.x - stepX,
+      y: endPoint.y - stepY
+    };
+    const points = [startPoint, midA, midB, endPoint];
+    return removeDuplicatePoints(
+      points.map((point) =>
+        snapRouting
+          ? {
+              x: snapAlways(point.x),
+              y: snapAlways(point.y)
+            }
+          : point
+      )
+    );
+  }
+
+  function cubicPointAt(start, c1, c2, end, t) {
+    const mt = 1 - t;
+    return {
+      x: mt * mt * mt * start.x + 3 * mt * mt * t * c1.x + 3 * mt * t * t * c2.x + t * t * t * end.x,
+      y: mt * mt * mt * start.y + 3 * mt * mt * t * c1.y + 3 * mt * t * t * c2.y + t * t * t * end.y
+    };
+  }
+
   function getDefaultCurveControlPoint(startPoint, endPoint, startAnchor) {
     const midX = (startPoint.x + endPoint.x) / 2;
     const midY = (startPoint.y + endPoint.y) / 2;
@@ -1096,72 +1504,484 @@
     };
   }
 
-  function getEdgeGeometry(edge) {
-    const endpoints = getEdgeEndpoints(edge);
-    if (!endpoints) {
+  function getAnchorVector(anchor) {
+    switch (anchor) {
+      case "left":
+        return { x: -1, y: 0 };
+      case "right":
+        return { x: 1, y: 0 };
+      case "top":
+        return { x: 0, y: -1 };
+      case "bottom":
+      default:
+        return { x: 0, y: 1 };
+    }
+  }
+
+  function movePointByAnchor(point, anchor, distance) {
+    const direction = getAnchorVector(anchor);
+    return {
+      x: point.x + direction.x * distance,
+      y: point.y + direction.y * distance
+    };
+  }
+
+  function lineSegmentIntersection(a1, a2, b1, b2) {
+    const s1x = a2.x - a1.x;
+    const s1y = a2.y - a1.y;
+    const s2x = b2.x - b1.x;
+    const s2y = b2.y - b1.y;
+    const denominator = -s2x * s1y + s1x * s2y;
+    if (Math.abs(denominator) < 0.00001) {
       return null;
     }
-
-    const route = normalizeEdgeRoute(edge.route);
-    const startPoint = endpoints.fromPoint;
-    const endPoint = endpoints.toPoint;
-
-    if (route.type === "straight") {
-      const points = [startPoint, endPoint];
+    const s = (-s1y * (a1.x - b1.x) + s1x * (a1.y - b1.y)) / denominator;
+    const t = (s2x * (a1.y - b1.y) - s2y * (a1.x - b1.x)) / denominator;
+    if (s >= 0 && s <= 1 && t >= 0 && t <= 1) {
       return {
-        pathData: pointsToPath(points),
-        labelPoint: getPolylineMidPoint(points),
-        controlHandle: null
+        x: a1.x + t * s1x,
+        y: a1.y + t * s1y,
+        tA: t,
+        tB: s
       };
     }
+    return null;
+  }
 
-    if (route.type === "curved") {
-      const defaultControl = getDefaultCurveControlPoint(startPoint, endPoint, edge.from.anchor);
-      const controlPoint = {
-        x: Number.isFinite(route.controlX) ? route.controlX : defaultControl.x,
-        y: Number.isFinite(route.controlY) ? route.controlY : defaultControl.y
-      };
+  function getNodeCustomConnectionPoint(node, customPointId) {
+    if (!node || !customPointId || !Array.isArray(node.connectionPoints)) {
+      return null;
+    }
+    const match = node.connectionPoints.find((point) => String(point?.id || "") === String(customPointId));
+    if (!match) {
+      return null;
+    }
+    const x = Number(match.x);
+    const y = Number(match.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      return null;
+    }
+    return {
+      x: node.x + clamp(x, 0, 1) * node.w,
+      y: node.y + clamp(y, 0, 1) * node.h
+    };
+  }
+
+  // EdgeEngine: endpoint/route/path/label/marker/jump hesaplarını tek bir yerde toplar.
+  const EdgeEngine = {
+    computeEndpoints(edge) {
+      ensureEdgeDefaults(edge);
+
+      const firstFrom = this.resolveEdgeEnd(edge.from, null);
+      const to = this.resolveEdgeEnd(edge.to, firstFrom?.point || null);
+      const from = this.resolveEdgeEnd(edge.from, to?.point || null);
+
+      if (!from || !to) {
+        return null;
+      }
+      if (from.groupId && to.groupId && from.groupId === to.groupId) {
+        return null;
+      }
+
       return {
-        pathData: `M ${startPoint.x} ${startPoint.y} Q ${controlPoint.x} ${controlPoint.y} ${endPoint.x} ${endPoint.y}`,
-        labelPoint: getQuadraticPointAt(startPoint, controlPoint, endPoint, 0.5),
-        controlHandle: {
+        fromPoint: from.point,
+        toPoint: to.point,
+        fromAnchor: from.anchor,
+        toAnchor: to.anchor,
+        fromNode: from.node,
+        toNode: to.node
+      };
+    },
+
+    resolveEdgeEnd(end, oppositePoint) {
+      if (!end) {
+        return null;
+      }
+
+      const pointX = Number(end?.point?.x);
+      const pointY = Number(end?.point?.y);
+      if (!end.nodeId && Number.isFinite(pointX) && Number.isFinite(pointY)) {
+        return {
+          point: { x: pointX, y: pointY },
+          anchor: normalizeAnchor(end.anchor),
+          groupId: null,
+          node: null
+        };
+      }
+
+      if (!end.nodeId) {
+        return null;
+      }
+
+      const collapsedGroup = getCollapsedGroupForNode(end.nodeId);
+      if (collapsedGroup) {
+        const frame = computeCollapsedGroupFrame(collapsedGroup);
+        const anchor =
+          end.mode === "floating" && oppositePoint
+            ? getNearestAnchorForPoint({ x: frame.x, y: frame.y, w: frame.w, h: frame.h }, oppositePoint)
+            : normalizeAnchor(end.anchor);
+        return {
+          point: getRectAnchorPoint(frame, anchor),
+          anchor,
+          groupId: collapsedGroup.id,
+          node: { x: frame.x, y: frame.y, w: frame.w, h: frame.h }
+        };
+      }
+
+      const node = getNodeById(end.nodeId);
+      if (!node) {
+        return null;
+      }
+
+      const customPoint = getNodeCustomConnectionPoint(node, end.customPointId);
+      if (customPoint && end.mode === "fixed") {
+        return {
+          point: customPoint,
+          anchor: normalizeAnchor(end.anchor),
+          groupId: null,
+          node
+        };
+      }
+
+      const anchor =
+        end.mode === "floating" && oppositePoint
+          ? getNearestAnchorForPoint(node, oppositePoint)
+          : normalizeAnchor(end.anchor);
+      return {
+        point: getAnchorPoint(node, anchor),
+        anchor,
+        groupId: null,
+        node
+      };
+    },
+
+    applyWaypoints(edge, points) {
+      const route = normalizeEdgeRoute(edge.route);
+      if (!route.waypoints.length || points.length < 2) {
+        return points;
+      }
+      const combined = [points[0], ...route.waypoints, points[points.length - 1]];
+      return removeDuplicatePoints(combined);
+    },
+
+    computeLabelAnchor(geometry, edge) {
+      const points = geometry.points || [];
+      if (!points.length) {
+        return {
+          point: { x: 0, y: 0 },
+          tangent: { x: 1, y: 0 },
+          normal: { x: 0, y: -1 }
+        };
+      }
+      if (points.length === 1) {
+        return {
+          point: points[0],
+          tangent: { x: 1, y: 0 },
+          normal: { x: 0, y: -1 }
+        };
+      }
+
+      const label = normalizeEdgeLabel(edge.label);
+      const position = clamp(Number(label.position), 0, 1);
+      const segmentLengths = [];
+      let totalLength = 0;
+      for (let i = 0; i < points.length - 1; i += 1) {
+        const length = Math.hypot(points[i + 1].x - points[i].x, points[i + 1].y - points[i].y);
+        segmentLengths.push(length);
+        totalLength += length;
+      }
+
+      if (totalLength <= 0.001) {
+        return {
+          point: points[0],
+          tangent: { x: 1, y: 0 },
+          normal: { x: 0, y: -1 }
+        };
+      }
+
+      const targetLength = totalLength * position;
+      let traversed = 0;
+      for (let i = 0; i < segmentLengths.length; i += 1) {
+        const segLength = segmentLengths[i];
+        if (traversed + segLength < targetLength && i < segmentLengths.length - 1) {
+          traversed += segLength;
+          continue;
+        }
+        const ratio = segLength <= 0.001 ? 0 : (targetLength - traversed) / segLength;
+        const ratioSafe = clamp(ratio, 0, 1);
+        const tangentRaw = {
+          x: points[i + 1].x - points[i].x,
+          y: points[i + 1].y - points[i].y
+        };
+        const tangentLen = Math.hypot(tangentRaw.x, tangentRaw.y) || 1;
+        const tangent = {
+          x: tangentRaw.x / tangentLen,
+          y: tangentRaw.y / tangentLen
+        };
+        const normal = {
+          x: -tangent.y,
+          y: tangent.x
+        };
+        const point = {
+          x: points[i].x + (points[i + 1].x - points[i].x) * ratioSafe,
+          y: points[i].y + (points[i + 1].y - points[i].y) * ratioSafe
+        };
+        return {
+          point: {
+            x: point.x + normal.x * label.normalOffset + label.offsetX,
+            y: point.y + normal.y * label.normalOffset + label.offsetY
+          },
+          tangent,
+          normal
+        };
+      }
+
+      return {
+        point: points[points.length - 1],
+        tangent: { x: 1, y: 0 },
+        normal: { x: 0, y: -1 }
+      };
+    },
+
+    computePath(edge) {
+      ensureEdgeDefaults(edge);
+      const endpoints = this.computeEndpoints(edge);
+      if (!endpoints) {
+        return null;
+      }
+
+      const route = normalizeEdgeRoute(edge.route);
+      const style = normalizeEdgeStyle(edge.style);
+      const snapRouting = route.snapToGrid && state.ui.snapToGrid;
+      const startPoint = endpoints.fromPoint;
+      const endPoint = endpoints.toPoint;
+
+      let points = [startPoint, endPoint];
+      let pathData = "";
+      let controlHandle = null;
+
+      if (route.type === "curved") {
+        const defaultControl = getDefaultCurveControlPoint(startPoint, endPoint, endpoints.fromAnchor);
+        const controlPoint = {
+          x: Number.isFinite(route.controlX) ? route.controlX : defaultControl.x,
+          y: Number.isFinite(route.controlY) ? route.controlY : defaultControl.y
+        };
+        const c1 = {
+          x: startPoint.x + (controlPoint.x - startPoint.x) * 0.68,
+          y: startPoint.y + (controlPoint.y - startPoint.y) * 0.68
+        };
+        const c2 = {
+          x: endPoint.x + (controlPoint.x - endPoint.x) * 0.68,
+          y: endPoint.y + (controlPoint.y - endPoint.y) * 0.68
+        };
+        pathData = `M ${startPoint.x} ${startPoint.y} C ${c1.x} ${c1.y} ${c2.x} ${c2.y} ${endPoint.x} ${endPoint.y}`;
+        points = [];
+        for (let i = 0; i <= 24; i += 1) {
+          points.push(cubicPointAt(startPoint, c1, c2, endPoint, i / 24));
+        }
+        controlHandle = {
           kind: "curve-control",
           axis: "xy",
           x: controlPoint.x,
           y: controlPoint.y
+        };
+      } else if (route.type === "orthogonal") {
+        points = buildOrthogonalPoints(startPoint, endPoint, endpoints.fromAnchor, route.bend, snapRouting);
+      } else if (route.type === "simple") {
+        points = buildOrthogonalPoints(startPoint, endPoint, endpoints.fromAnchor, null, snapRouting);
+      } else if (route.type === "isometric") {
+        points = buildIsometricPoints(startPoint, endPoint, snapRouting);
+      } else if (route.type === "entityRelation") {
+        const stub = 24;
+        const startStub = movePointByAnchor(startPoint, endpoints.fromAnchor, stub);
+        const endStub = movePointByAnchor(endPoint, endpoints.toAnchor, stub);
+        const middle = buildOrthogonalPoints(startStub, endStub, endpoints.fromAnchor, route.bend, snapRouting);
+        points = [startPoint, ...middle.slice(1, -1), endStub, endPoint];
+      } else {
+        points = [startPoint, endPoint];
+      }
+
+      if (route.type !== "curved") {
+        points = this.applyWaypoints(edge, points);
+        if (style.sketch) {
+          pathData = pointsToSketchPath(points);
+        } else if (style.cornerStyle === "rounded") {
+          const radius = route.cornerRadius > 0 ? route.cornerRadius : 12;
+          pathData = pointsToRoundedPath(points, radius);
+        } else if (style.cornerStyle === "curved") {
+          pathData = pointsToCurvedPath(points);
+        } else {
+          pathData = pointsToPath(points);
         }
+
+        const horizontalStart = endpoints.fromAnchor === "left" || endpoints.fromAnchor === "right";
+        if (horizontalStart && points.length >= 3) {
+          controlHandle = {
+            kind: "orth-bend",
+            axis: "x",
+            x: points[1].x,
+            y: (startPoint.y + endPoint.y) / 2
+          };
+        } else if (!horizontalStart && points.length >= 3) {
+          controlHandle = {
+            kind: "orth-bend",
+            axis: "y",
+            x: (startPoint.x + endPoint.x) / 2,
+            y: points[1].y
+          };
+        }
+      }
+
+      const labelMeta = this.computeLabelAnchor({ points }, edge);
+      return {
+        pathData,
+        d: pathData,
+        points,
+        segments: getSegmentsFromPoints(points, edge.id),
+        labelPoint: labelMeta.point,
+        labelAnchor: labelMeta.point,
+        labelTangent: labelMeta.tangent,
+        labelNormal: labelMeta.normal,
+        controlHandle,
+        endpoints,
+        route,
+        style
       };
+    },
+
+    buildMarkers(defs, edges, markerPrefix = "edge-marker") {
+      if (!defs) {
+        return new Map();
+      }
+      Array.from(defs.querySelectorAll("[data-edge-marker='1']")).forEach((marker) => marker.remove());
+
+      const created = new Map();
+      const markerRefs = new Map();
+      const getOrCreateMarker = (spec) => {
+        const key = JSON.stringify(spec);
+        if (created.has(key)) {
+          return created.get(key);
+        }
+        const markerId = `${markerPrefix}-${created.size + 1}`;
+        const markerSize = Math.max(4, spec.size);
+        const refX = markerSize + spec.spacing;
+        const marker = createSvgElement("marker", {
+          id: markerId,
+          markerWidth: markerSize + Math.abs(spec.spacing) + 2,
+          markerHeight: markerSize + 2,
+          refX,
+          refY: markerSize / 2 + 1,
+          orient: spec.isStart ? "auto-start-reverse" : "auto",
+          markerUnits: "userSpaceOnUse",
+          viewBox: `0 0 ${markerSize + 2} ${markerSize + 2}`,
+          "data-edge-marker": "1"
+        });
+
+        if (spec.type === "oval") {
+          marker.appendChild(
+            createSvgElement("ellipse", {
+              cx: markerSize * 0.52,
+              cy: markerSize / 2 + 1,
+              rx: markerSize * 0.44,
+              ry: markerSize * 0.34,
+              fill: spec.fill ? spec.color : "none",
+              stroke: spec.color,
+              "stroke-width": 1.2
+            })
+          );
+        } else {
+          const shapes = {
+            classic: `M 0 1 L ${markerSize} ${markerSize / 2 + 1} L 0 ${markerSize + 1} L ${markerSize * 0.28} ${markerSize / 2 + 1} Z`,
+            block: `M 0 1 L ${markerSize} ${markerSize / 2 + 1} L 0 ${markerSize + 1} Z`,
+            open: `M 0 1 L ${markerSize} ${markerSize / 2 + 1} L 0 ${markerSize + 1}`,
+            diamond: `M ${markerSize * 0.5} 1 L ${markerSize} ${markerSize / 2 + 1} L ${markerSize * 0.5} ${markerSize + 1} L 0 ${markerSize / 2 + 1} Z`
+          };
+          marker.appendChild(
+            createSvgElement("path", {
+              d: shapes[spec.type] || shapes.block,
+              fill: spec.type === "open" || !spec.fill ? "none" : spec.color,
+              stroke: spec.color,
+              "stroke-width": spec.type === "open" ? 1.5 : 1
+            })
+          );
+        }
+
+        defs.appendChild(marker);
+        created.set(key, markerId);
+        return markerId;
+      };
+
+      edges.forEach((edge) => {
+        const style = normalizeEdgeStyle(edge.style);
+        const refsForEdge = {};
+        if (style.startArrow !== "none") {
+          refsForEdge.start = getOrCreateMarker({
+            type: style.startArrow,
+            size: style.startSize,
+            spacing: style.startSpacing,
+            fill: style.arrowFill,
+            color: style.stroke,
+            isStart: true
+          });
+        }
+        if (style.endArrow !== "none") {
+          refsForEdge.end = getOrCreateMarker({
+            type: style.endArrow,
+            size: style.endSize,
+            spacing: style.endSpacing,
+            fill: style.arrowFill,
+            color: style.stroke,
+            isStart: false
+          });
+        }
+        markerRefs.set(edge.id, refsForEdge);
+      });
+
+      return markerRefs;
+    },
+
+    computeIntersectionsForJumps(edgeGeometryList) {
+      const jumpMap = new Map();
+      for (let i = 0; i < edgeGeometryList.length; i += 1) {
+        const first = edgeGeometryList[i];
+        if (!first?.geometry?.segments?.length) {
+          continue;
+        }
+        const firstStyle = normalizeEdgeStyle(first.edge.style);
+        if (firstStyle.jumpStyle === "none") {
+          continue;
+        }
+        for (let j = i + 1; j < edgeGeometryList.length; j += 1) {
+          const second = edgeGeometryList[j];
+          if (!second?.geometry?.segments?.length) {
+            continue;
+          }
+          first.geometry.segments.forEach((segA) => {
+            second.geometry.segments.forEach((segB) => {
+              const hit = lineSegmentIntersection(segA.a, segA.b, segB.a, segB.b);
+              if (!hit) {
+                return;
+              }
+              const nearSegmentEdge = hit.tA < 0.08 || hit.tA > 0.92 || hit.tB < 0.08 || hit.tB > 0.92;
+              if (nearSegmentEdge) {
+                return;
+              }
+              const list = jumpMap.get(first.edge.id) || [];
+              list.push({
+                point: { x: hit.x, y: hit.y },
+                segmentIndex: segA.index
+              });
+              jumpMap.set(first.edge.id, list);
+            });
+          });
+        }
+      }
+      return jumpMap;
     }
+  };
 
-    const points = buildOrthogonalPoints(startPoint, endPoint, edge.from.anchor, route.bend);
-    const pathData =
-      route.cornerRadius > 0 ? pointsToRoundedPath(points, route.cornerRadius) : pointsToPath(points);
-    const horizontalStart = edge.from.anchor === "left" || edge.from.anchor === "right";
-    let controlHandle = null;
-
-    if (horizontalStart && points.length >= 3) {
-      const bendX = points[1].x;
-      controlHandle = {
-        kind: "orth-bend",
-        axis: "x",
-        x: bendX,
-        y: (startPoint.y + endPoint.y) / 2
-      };
-    } else if (!horizontalStart && points.length >= 3) {
-      const bendY = points[1].y;
-      controlHandle = {
-        kind: "orth-bend",
-        axis: "y",
-        x: (startPoint.x + endPoint.x) / 2,
-        y: bendY
-      };
-    }
-
-    return {
-      pathData,
-      labelPoint: getPolylineMidPoint(points),
-      controlHandle
-    };
+  function getEdgeGeometry(edge) {
+    return EdgeEngine.computePath(edge, state.doc.nodes, state.ui, normalizeEdgeRoute(edge.route).type);
   }
 
   function getPolylineMidPoint(points) {
@@ -1227,46 +2047,12 @@
   }
 
   function getEdgeEndWorldPoint(end) {
-    if (end?.point && Number.isFinite(end.point.x) && Number.isFinite(end.point.y)) {
-      return { point: { x: end.point.x, y: end.point.y }, groupId: null };
-    }
-
-    if (!end?.nodeId) {
-      return null;
-    }
-
-    const collapsedGroup = getCollapsedGroupForNode(end.nodeId);
-    if (collapsedGroup) {
-      const frame = computeCollapsedGroupFrame(collapsedGroup);
-      return {
-        point: getRectAnchorPoint(frame, normalizeAnchor(end.anchor)),
-        groupId: collapsedGroup.id
-      };
-    }
-
-    const node = getNodeById(end.nodeId);
-    if (!node) {
-      return null;
-    }
-    return {
-      point: getAnchorPoint(node, normalizeAnchor(end.anchor)),
-      groupId: null
-    };
+    const resolved = EdgeEngine.resolveEdgeEnd(normalizeEdgeEndpoint(end, "right"), null);
+    return resolved ? { point: resolved.point, groupId: resolved.groupId } : null;
   }
 
   function getEdgeEndpoints(edge) {
-    const fromEndpoint = getEdgeEndWorldPoint(edge.from);
-    const toEndpoint = getEdgeEndWorldPoint(edge.to);
-    if (!fromEndpoint || !toEndpoint) {
-      return null;
-    }
-    if (fromEndpoint.groupId && toEndpoint.groupId && fromEndpoint.groupId === toEndpoint.groupId) {
-      return null;
-    }
-    return {
-      fromPoint: fromEndpoint.point,
-      toPoint: toEndpoint.point
-    };
+    return EdgeEngine.computeEndpoints(edge);
   }
 
   function getEdgeStrokeColor(edge) {
@@ -1306,9 +2092,26 @@
 
       const orderedNodes = [...state.doc.nodes].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
       const singleSelectedNodeId = state.selectedNodeIds.size === 1 ? [...state.selectedNodeIds][0] : null;
+      const defs = refs.canvas.querySelector("defs");
+      const markerRefs = EdgeEngine.buildMarkers(defs, state.doc.edges);
+      const edgeGeometryList = state.doc.edges
+        .map((edge, index) => ({
+          edge,
+          index,
+          geometry: getEdgeGeometry(edge)
+        }))
+        .filter((item) => Boolean(item.geometry));
+      const jumpMap = EdgeEngine.computeIntersectionsForJumps(edgeGeometryList);
 
-      state.doc.edges.forEach((edge) => {
-        const edgeElement = Renderer.buildEdgeElement(edge, edge.id === state.selectedEdgeId, true);
+      edgeGeometryList.forEach((item) => {
+        const edgeElement = Renderer.buildEdgeElement(
+          item.edge,
+          state.selectedEdgeIds.has(item.edge.id),
+          true,
+          markerRefs.get(item.edge.id) || {},
+          item.geometry,
+          jumpMap.get(item.edge.id) || []
+        );
         if (edgeElement) {
           refs.edgeLayer.appendChild(edgeElement);
         }
@@ -1543,7 +2346,15 @@
         group.appendChild(shape);
       };
 
-      if (node.type === "oval") {
+      if (node.type === "junction") {
+        appendMainShape(
+          createSvgElement("circle", {
+            cx: node.w / 2,
+            cy: node.h / 2,
+            r: Math.max(4, Math.min(node.w, node.h) / 2)
+          })
+        );
+      } else if (node.type === "oval") {
         appendMainShape(
           createSvgElement("ellipse", {
             cx: node.w / 2,
@@ -1650,22 +2461,24 @@
         );
       }
 
-      const textStyle = node.textStyle || defaultTextStyle;
-      const latex = parseLatexExpression(node.text || "");
-      const renderedMath = latex
-        ? Renderer.applyMathLayout(group, node, latex, textStyle.color || defaultTextStyle.color)
-        : false;
-      if (!renderedMath) {
-        const text = createSvgElement("text", {
-          class: "node-text",
-          "font-family": textStyle.fontFamily || defaultTextStyle.fontFamily,
-          "font-size": Number(textStyle.fontSize) || defaultTextStyle.fontSize,
-          fill: textStyle.color || defaultTextStyle.color,
-          "font-weight": textStyle.bold ? "700" : "400",
-          "font-style": textStyle.italic ? "italic" : "normal"
-        });
-        Renderer.applyTextLayout(text, node.text || "", node, textStyle.align || "center");
-        group.appendChild(text);
+      if (node.type !== "junction") {
+        const textStyle = node.textStyle || defaultTextStyle;
+        const latex = parseLatexExpression(node.text || "");
+        const renderedMath = latex
+          ? Renderer.applyMathLayout(group, node, latex, textStyle.color || defaultTextStyle.color)
+          : false;
+        if (!renderedMath) {
+          const text = createSvgElement("text", {
+            class: "node-text",
+            "font-family": textStyle.fontFamily || defaultTextStyle.fontFamily,
+            "font-size": Number(textStyle.fontSize) || defaultTextStyle.fontSize,
+            fill: textStyle.color || defaultTextStyle.color,
+            "font-weight": textStyle.bold ? "700" : "400",
+            "font-style": textStyle.italic ? "italic" : "normal"
+          });
+          Renderer.applyTextLayout(text, node.text || "", node, textStyle.align || "center");
+          group.appendChild(text);
+        }
       }
 
       if (options.interactive && options.showAnchors) {
@@ -1839,71 +2652,192 @@
       });
     },
 
-    buildEdgeElement(edge, selected, interactive, markerIdByStrokeColor = null) {
-      const geometry = getEdgeGeometry(edge);
-      if (!geometry) {
+    buildEdgeElement(edge, selected, interactive, markerRefs = {}, geometry = null, jumps = []) {
+      const safeGeometry = geometry || getEdgeGeometry(edge);
+      if (!safeGeometry) {
         return null;
       }
 
-      const edgeStyle = edge.style || defaultEdgeStyle;
+      const edgeStyle = normalizeEdgeStyle(edge.style);
+      const edgeLabel = normalizeEdgeLabel(edge.label);
       const strokeColor = getEdgeStrokeColor(edge);
       const strokeWidth = Number(edgeStyle.strokeWidth) || defaultEdgeStyle.strokeWidth;
+      const dashMap = {
+        solid: "none",
+        dashed: `${edgeStyle.dashLength} ${edgeStyle.gapLength}`,
+        dotted: `1 ${Math.max(2, edgeStyle.gapLength)}`
+      };
+      const dashArray = dashMap[edgeStyle.pattern] || dashMap.solid;
 
       const group = createSvgElement("g", {
         class: `edge${selected ? " selected" : ""}`,
         "data-edge-id": edge.id
       });
 
+      if (edgeStyle.shadow) {
+        const shadowPath = createSvgElement("path", {
+          class: "edge-path edge-shadow",
+          d: safeGeometry.pathData,
+          fill: "none",
+          stroke: "#0f172a",
+          "stroke-width": strokeWidth + 1.5,
+          "stroke-linejoin": "round",
+          "stroke-linecap": "round",
+          "stroke-opacity": 0.22,
+          "vector-effect": "non-scaling-stroke"
+        });
+        group.appendChild(shadowPath);
+      }
+
       const path = createSvgElement("path", {
         class: "edge-path",
-        d: geometry.pathData,
+        d: safeGeometry.pathData,
         fill: "none",
         stroke: strokeColor,
         "stroke-width": strokeWidth,
-        "stroke-dasharray": edgeStyle.dashed ? "7 5" : "none",
-        "stroke-linejoin": "round",
-        "stroke-linecap": "round",
+        "stroke-opacity": edgeStyle.opacity,
+        "stroke-dasharray": dashArray,
+        "stroke-linejoin": edgeStyle.cornerStyle === "sharp" ? "miter" : "round",
+        "stroke-linecap": edgeStyle.pattern === "dotted" ? "round" : "round",
         "vector-effect": "non-scaling-stroke"
       });
-      if (edgeStyle.arrow) {
-        if (markerIdByStrokeColor instanceof Map && markerIdByStrokeColor.size) {
-          const markerId = markerIdByStrokeColor.get(strokeColor.toLowerCase());
-          if (markerId) {
-            path.setAttribute("marker-end", `url(#${markerId})`);
-          }
-        } else {
-          path.setAttribute("marker-end", "url(#arrowHead)");
-        }
+      if (markerRefs?.start) {
+        path.setAttribute("marker-start", `url(#${markerRefs.start})`);
+      }
+      if (markerRefs?.end) {
+        path.setAttribute("marker-end", `url(#${markerRefs.end})`);
       }
       group.appendChild(path);
+
+      if (edgeStyle.flowEnabled) {
+        const flowPath = createSvgElement("path", {
+          class: "edge-flow-overlay",
+          d: safeGeometry.pathData,
+          fill: "none",
+          stroke: strokeColor,
+          "stroke-width": Math.max(1, strokeWidth - 0.5),
+          "stroke-opacity": clamp(edgeStyle.opacity + 0.1, 0.1, 1),
+          "stroke-dasharray": edgeStyle.pattern === "solid" ? "10 8" : dashArray,
+          "stroke-linecap": "round"
+        });
+        const durationMs = clamp(2400 - edgeStyle.flowSpeed * 180, 400, 2800);
+        flowPath.style.animationDuration = `${durationMs}ms`;
+        flowPath.style.animationDirection = edgeStyle.flowDirection === "backward" ? "reverse" : "normal";
+        group.appendChild(flowPath);
+      }
+
+      if (Array.isArray(jumps) && jumps.length && edgeStyle.jumpStyle !== "none") {
+        const jumpGapFill = state.ui.theme === "dark" ? "#0f172a" : "#ffffff";
+        jumps.forEach((jump) => {
+          const seg = safeGeometry.segments[jump.segmentIndex];
+          if (!seg) {
+            return;
+          }
+          const size = edgeStyle.jumpSize;
+          const tangentLen = Math.hypot(seg.b.x - seg.a.x, seg.b.y - seg.a.y) || 1;
+          const tangent = {
+            x: (seg.b.x - seg.a.x) / tangentLen,
+            y: (seg.b.y - seg.a.y) / tangentLen
+          };
+          const normal = { x: -tangent.y, y: tangent.x };
+          if (edgeStyle.jumpStyle === "gap") {
+            group.appendChild(
+              createSvgElement("circle", {
+                cx: jump.point.x,
+                cy: jump.point.y,
+                r: Math.max(2, size * 0.42),
+                fill: jumpGapFill
+              })
+            );
+            return;
+          }
+          const start = {
+            x: jump.point.x - tangent.x * (size * 0.5),
+            y: jump.point.y - tangent.y * (size * 0.5)
+          };
+          const end = {
+            x: jump.point.x + tangent.x * (size * 0.5),
+            y: jump.point.y + tangent.y * (size * 0.5)
+          };
+          const lift = edgeStyle.jumpStyle === "sharp" ? size * 0.95 : size * 0.8;
+          const peak = {
+            x: jump.point.x + normal.x * lift,
+            y: jump.point.y + normal.y * lift
+          };
+          group.appendChild(
+            createSvgElement("path", {
+              d: `M ${start.x} ${start.y} Q ${peak.x} ${peak.y} ${end.x} ${end.y}`,
+              fill: "none",
+              stroke: strokeColor,
+              "stroke-width": strokeWidth,
+              "stroke-linecap": "round",
+              "stroke-linejoin": "round"
+            })
+          );
+        });
+      }
 
       if (interactive) {
         const hitPath = createSvgElement("path", {
           class: "edge-hit",
-          d: geometry.pathData,
-          fill: "none"
+          d: safeGeometry.pathData,
+          fill: "none",
+          "data-edge-id": edge.id,
+          "data-edge-hit": "1"
         });
         group.appendChild(hitPath);
       }
 
-      if (edge.label && edge.label.text) {
-        const labelPoint = geometry.labelPoint;
-        const labelOffsetX = Number.isFinite(Number(edge.label.offsetX)) ? Number(edge.label.offsetX) : 0;
-        const labelOffsetY = Number.isFinite(Number(edge.label.offsetY)) ? Number(edge.label.offsetY) : 0;
+      if (edgeLabel.text) {
+        const labelPoint = safeGeometry.labelPoint || { x: 0, y: 0 };
+        const estWidth = Math.max(24, edgeLabel.text.length * edgeLabel.fontSize * 0.58) + edgeLabel.padding * 2;
+        const estHeight = edgeLabel.fontSize * 1.3 + edgeLabel.padding * 2;
+        const boxX = labelPoint.x - estWidth / 2;
+        const boxY = labelPoint.y - estHeight / 2;
+        const textAnchor =
+          edgeLabel.align === "left" ? "start" : edgeLabel.align === "right" ? "end" : "middle";
+        const textX =
+          edgeLabel.align === "left"
+            ? boxX + edgeLabel.padding
+            : edgeLabel.align === "right"
+              ? boxX + estWidth - edgeLabel.padding
+              : labelPoint.x;
+        const labelGroup = createSvgElement("g", {
+          "data-edge-id": edge.id,
+          "data-edge-label-group": "1"
+        });
+        labelGroup.appendChild(
+          createSvgElement("rect", {
+            x: boxX,
+            y: boxY,
+            width: estWidth,
+            height: estHeight,
+            rx: 4,
+            ry: 4,
+            fill: edgeLabel.backgroundColor,
+            "fill-opacity": 0.95,
+            stroke: edgeLabel.borderColor,
+            "stroke-width": edgeLabel.borderWidth
+          })
+        );
         const label = createSvgElement("text", {
           class: "edge-label",
-          x: labelPoint.x + labelOffsetX,
-          y: labelPoint.y - 6 + labelOffsetY,
+          x: textX,
+          y: labelPoint.y,
           "data-edge-id": edge.id,
           "data-edge-label": "1",
-          "font-size": Number(edge.label.fontSize) || defaultEdgeLabel.fontSize,
-          fill: edge.label.color || defaultEdgeLabel.color,
-          "font-weight": "600",
-          "text-anchor": "middle",
+          "font-family": edgeLabel.fontFamily,
+          "font-size": edgeLabel.fontSize,
+          fill: edgeLabel.color,
+          "font-weight": edgeLabel.bold ? "700" : "500",
+          "font-style": edgeLabel.italic ? "italic" : "normal",
+          "text-decoration": edgeLabel.underline ? "underline" : "none",
+          "text-anchor": textAnchor,
           "dominant-baseline": "middle"
         });
-        label.textContent = edge.label.text;
-        group.appendChild(label);
+        label.textContent = edgeLabel.text;
+        labelGroup.appendChild(label);
+        group.appendChild(labelGroup);
       }
 
       return group;
@@ -1930,19 +2864,33 @@
         if (!fromNode) {
           return;
         }
-        const fromPoint = getAnchorPoint(fromNode, state.interaction.connectFrom.anchor);
         const previewTarget = {
           x: snapAlways(state.interaction.currentWorld.x),
           y: snapAlways(state.interaction.currentWorld.y)
         };
-        const previewPoints = buildOrthogonalPoints(
-          fromPoint,
-          previewTarget,
-          state.interaction.connectFrom.anchor
+        const previewEdge = createEdge(
+          state.interaction.connectFrom.nodeId,
+          state.interaction.connectFrom.anchor,
+          null,
+          "left",
+          "preview_temp"
         );
+        applyDefaultConnectorStyle(previewEdge);
+        previewEdge.from.mode = "fixed";
+        previewEdge.to = {
+          nodeId: null,
+          anchor: "left",
+          mode: "fixed",
+          point: previewTarget,
+          customPointId: null
+        };
+        const previewGeometry = EdgeEngine.computePath(previewEdge);
+        if (!previewGeometry) {
+          return;
+        }
         const path = createSvgElement("path", {
           class: "connection-preview",
-          d: pointsToPath(previewPoints)
+          d: previewGeometry.pathData
         });
         refs.overlayLayer.appendChild(path);
       }
@@ -1984,13 +2932,27 @@
             refs.overlayLayer.appendChild(startHandle);
             refs.overlayLayer.appendChild(endHandle);
           }
+
+          const waypoints = normalizeEdgeRoute(selectedEdge.route).waypoints;
+          waypoints.forEach((waypoint, index) => {
+            const handle = createSvgElement("rect", {
+              class: "edge-waypoint-handle",
+              x: waypoint.x - 4,
+              y: waypoint.y - 4,
+              width: 8,
+              height: 8,
+              "data-edge-id": selectedEdge.id,
+              "data-waypoint-index": index
+            });
+            refs.overlayLayer.appendChild(handle);
+          });
         }
       }
 
       const singleSelectedNodeId = state.selectedNodeIds.size === 1 ? [...state.selectedNodeIds][0] : null;
       if (
         singleSelectedNodeId &&
-        !state.selectedEdgeId &&
+        state.selectedEdgeIds.size === 0 &&
         (state.interaction.mode === null || state.interaction.mode === "pan")
       ) {
         const node = getNodeById(singleSelectedNodeId);
@@ -2054,31 +3016,7 @@
       });
 
       const defs = createSvgElement("defs");
-      const markerIdByStrokeColor = new Map();
-      const exportArrowColors = new Set(
-        state.doc.edges
-          .filter((edge) => (edge.style || defaultEdgeStyle).arrow)
-          .map((edge) => getEdgeStrokeColor(edge).toLowerCase())
-      );
-      exportArrowColors.forEach((color, index) => {
-        const markerId = `arrowHeadExport${index + 1}`;
-        const marker = createSvgElement("marker", {
-          id: markerId,
-          markerWidth: 10,
-          markerHeight: 10,
-          refX: 9,
-          refY: 5,
-          orient: "auto",
-          markerUnits: "strokeWidth"
-        });
-        const markerPath = createSvgElement("path", {
-          d: "M0,0 L10,5 L0,10 Z",
-          fill: color
-        });
-        marker.appendChild(markerPath);
-        defs.appendChild(marker);
-        markerIdByStrokeColor.set(color, markerId);
-      });
+      const markerRefs = EdgeEngine.buildMarkers(defs, state.doc.edges, "edge-export-marker");
       svg.appendChild(defs);
 
       const background = createSvgElement("rect", {
@@ -2091,8 +3029,23 @@
       svg.appendChild(background);
 
       const edgeLayer = createSvgElement("g");
-      state.doc.edges.forEach((edge) => {
-        const edgeEl = Renderer.buildEdgeElement(edge, false, false, markerIdByStrokeColor);
+      const edgeGeometryList = state.doc.edges
+        .map((edge, index) => ({
+          edge,
+          index,
+          geometry: getEdgeGeometry(edge)
+        }))
+        .filter((item) => Boolean(item.geometry));
+      const jumpMap = EdgeEngine.computeIntersectionsForJumps(edgeGeometryList);
+      edgeGeometryList.forEach((item) => {
+        const edgeEl = Renderer.buildEdgeElement(
+          item.edge,
+          false,
+          false,
+          markerRefs.get(item.edge.id) || {},
+          item.geometry,
+          jumpMap.get(item.edge.id) || []
+        );
         if (edgeEl) {
           edgeLayer.appendChild(edgeEl);
         }
@@ -2166,8 +3119,9 @@
       lines.push(`  <edges>`);
 
       doc.edges.forEach((edge) => {
-        const style = edge.style || defaultEdgeStyle;
-        const label = edge.label || defaultEdgeLabel;
+        ensureEdgeDefaults(edge);
+        const style = normalizeEdgeStyle(edge.style);
+        const label = normalizeEdgeLabel(edge.label);
         const route = normalizeEdgeRoute(edge.route);
         const bendAttr = route.bend == null ? "" : route.bend;
         const controlXAttr = route.controlX == null ? "" : route.controlX;
@@ -2178,22 +3132,51 @@
         const fromPointY = edge.from?.point && Number.isFinite(edge.from.point.y) ? edge.from.point.y : "";
         const toPointX = edge.to?.point && Number.isFinite(edge.to.point.x) ? edge.to.point.x : "";
         const toPointY = edge.to?.point && Number.isFinite(edge.to.point.y) ? edge.to.point.y : "";
-        const labelOffsetX = Number.isFinite(Number(label.offsetX)) ? Number(label.offsetX) : 0;
-        const labelOffsetY = Number.isFinite(Number(label.offsetY)) ? Number(label.offsetY) : 0;
 
         lines.push(
           `    <edge id="${escapeXml(edge.id)}" from="${escapeXml(fromNode)}:${escapeXml(
             edge.from.anchor
-          )}" to="${escapeXml(toNode)}:${escapeXml(edge.to.anchor)}" fromX="${fromPointX}" fromY="${fromPointY}" toX="${toPointX}" toY="${toPointY}" stroke="${escapeXml(style.stroke)}" strokeWidth="${
-            style.strokeWidth
-          }" dashed="${style.dashed ? "1" : "0"}" arrow="${style.arrow ? "1" : "0"}" routeType="${escapeXml(
+          )}" to="${escapeXml(toNode)}:${escapeXml(edge.to.anchor)}" fromX="${fromPointX}" fromY="${fromPointY}" toX="${toPointX}" toY="${toPointY}" fromMode="${escapeXml(
+            edge.from.mode || "floating"
+          )}" toMode="${escapeXml(edge.to.mode || "floating")}" fromCustom="${escapeXml(
+            edge.from.customPointId || ""
+          )}" toCustom="${escapeXml(edge.to.customPointId || "")}" routing="${escapeXml(
             route.type
-          )}" cornerRadius="${route.cornerRadius}" bend="${bendAttr}" controlX="${controlXAttr}" controlY="${controlYAttr}">`
+          )}" snapRouting="${route.snapToGrid ? "1" : "0"}" corner="${escapeXml(
+            style.cornerStyle
+          )}" cornerRadius="${route.cornerRadius}" stroke="${escapeXml(style.stroke)}" strokeWidth="${
+            style.strokeWidth
+          }" pattern="${escapeXml(style.pattern)}" dashLength="${style.dashLength}" gapLength="${style.gapLength}" opacity="${
+            style.opacity
+          }" shadow="${style.shadow ? "1" : "0"}" sketch="${style.sketch ? "1" : "0"}" startArrow="${escapeXml(
+            style.startArrow
+          )}" endArrow="${escapeXml(style.endArrow)}" startSize="${style.startSize}" endSize="${style.endSize}" startSpacing="${
+            style.startSpacing
+          }" endSpacing="${style.endSpacing}" arrowFill="${style.arrowFill ? "1" : "0"}" jumpStyle="${escapeXml(
+            style.jumpStyle
+          )}" jumpSize="${style.jumpSize}" flow="${style.flowEnabled ? "1" : "0"}" flowSpeed="${style.flowSpeed}" flowDir="${escapeXml(
+            style.flowDirection
+          )}" bend="${bendAttr}" controlX="${controlXAttr}" controlY="${controlYAttr}">`
         );
+        if (route.waypoints.length) {
+          lines.push(`      <waypoints>`);
+          route.waypoints.forEach((point) => {
+            lines.push(`        <pt x="${point.x}" y="${point.y}" />`);
+          });
+          lines.push(`      </waypoints>`);
+        }
         lines.push(
-          `      <label fontSize="${label.fontSize}" color="${escapeXml(label.color)}" offsetX="${labelOffsetX}" offsetY="${labelOffsetY}">${escapeXml(
-            label.text || ""
-          )}</label>`
+          `      <label text="${escapeXml(label.text || "")}" fontFamily="${escapeXml(
+            label.fontFamily
+          )}" fontSize="${label.fontSize}" color="${escapeXml(label.color)}" bold="${label.bold ? "1" : "0"}" italic="${
+            label.italic ? "1" : "0"
+          }" underline="${label.underline ? "1" : "0"}" align="${escapeXml(
+            label.align
+          )}" background="${escapeXml(label.backgroundColor)}" border="${escapeXml(
+            label.borderColor
+          )}" borderWidth="${label.borderWidth}" padding="${label.padding}" position="${label.position}" normalOffset="${
+            label.normalOffset
+          }" offset="${label.offsetX},${label.offsetY}" />`
         );
         lines.push(`    </edge>`);
       });
@@ -2270,10 +3253,12 @@
         }
 
         const node = createNode(type, 0, 0, id);
+        const minW = type === "junction" ? 12 : MIN_NODE_W;
+        const minH = type === "junction" ? 12 : MIN_NODE_H;
         node.x = parseNumberAttr(nodeEl.getAttribute("x"), 0);
         node.y = parseNumberAttr(nodeEl.getAttribute("y"), 0);
-        node.w = Math.max(MIN_NODE_W, parseNumberAttr(nodeEl.getAttribute("w"), node.w));
-        node.h = Math.max(MIN_NODE_H, parseNumberAttr(nodeEl.getAttribute("h"), node.h));
+        node.w = Math.max(minW, parseNumberAttr(nodeEl.getAttribute("w"), node.w));
+        node.h = Math.max(minH, parseNumberAttr(nodeEl.getAttribute("h"), node.h));
         node.zIndex = parseNumberAttr(nodeEl.getAttribute("zIndex"), index + 1);
 
         const textEl = nodeEl.getElementsByTagName("text")[0];
@@ -2362,29 +3347,87 @@
         if (!toNodeId && hasToPoint) {
           edge.to.point = { x: toPoint.x, y: toPoint.y };
         }
-        edge.style = {
+        edge.from.mode = edgeEl.getAttribute("fromMode") === "fixed" ? "fixed" : "floating";
+        edge.to.mode = edgeEl.getAttribute("toMode") === "fixed" ? "fixed" : "floating";
+        edge.from.customPointId = edgeEl.getAttribute("fromCustom") || null;
+        edge.to.customPointId = edgeEl.getAttribute("toCustom") || null;
+        edge.style = normalizeEdgeStyle({
           stroke: sanitizeColor(edgeEl.getAttribute("stroke"), defaultEdgeStyle.stroke),
           strokeWidth: Math.max(1, parseNumberAttr(edgeEl.getAttribute("strokeWidth"), defaultEdgeStyle.strokeWidth)),
-          dashed: parseBooleanAttr(edgeEl.getAttribute("dashed"), defaultEdgeStyle.dashed),
-          arrow: parseBooleanAttr(edgeEl.getAttribute("arrow"), defaultEdgeStyle.arrow)
-        };
+          pattern: edgeEl.getAttribute("pattern"),
+          dashLength: parseNumberAttr(edgeEl.getAttribute("dashLength"), defaultEdgeStyle.dashLength),
+          gapLength: parseNumberAttr(edgeEl.getAttribute("gapLength"), defaultEdgeStyle.gapLength),
+          opacity: parseNumberAttr(edgeEl.getAttribute("opacity"), defaultEdgeStyle.opacity),
+          shadow: parseBooleanAttr(edgeEl.getAttribute("shadow"), defaultEdgeStyle.shadow),
+          sketch: parseBooleanAttr(edgeEl.getAttribute("sketch"), defaultEdgeStyle.sketch),
+          cornerStyle: edgeEl.getAttribute("corner"),
+          startArrow: edgeEl.getAttribute("startArrow"),
+          endArrow: edgeEl.getAttribute("endArrow"),
+          startSize: parseNumberAttr(edgeEl.getAttribute("startSize"), defaultEdgeStyle.startSize),
+          endSize: parseNumberAttr(edgeEl.getAttribute("endSize"), defaultEdgeStyle.endSize),
+          startSpacing: parseNumberAttr(edgeEl.getAttribute("startSpacing"), defaultEdgeStyle.startSpacing),
+          endSpacing: parseNumberAttr(edgeEl.getAttribute("endSpacing"), defaultEdgeStyle.endSpacing),
+          arrowFill: parseBooleanAttr(edgeEl.getAttribute("arrowFill"), defaultEdgeStyle.arrowFill),
+          jumpStyle: edgeEl.getAttribute("jumpStyle"),
+          jumpSize: parseNumberAttr(edgeEl.getAttribute("jumpSize"), defaultEdgeStyle.jumpSize),
+          flowEnabled: parseBooleanAttr(edgeEl.getAttribute("flow"), defaultEdgeStyle.flowEnabled),
+          flowSpeed: parseNumberAttr(edgeEl.getAttribute("flowSpeed"), defaultEdgeStyle.flowSpeed),
+          flowDirection: edgeEl.getAttribute("flowDir"),
+          dashed: parseBooleanAttr(edgeEl.getAttribute("dashed"), defaultEdgeStyle.pattern === "dashed"),
+          arrow: parseBooleanAttr(edgeEl.getAttribute("arrow"), defaultEdgeStyle.endArrow !== "none")
+        });
+        const waypointsEl = edgeEl.getElementsByTagName("waypoints")[0];
+        const waypointElements = waypointsEl ? Array.from(waypointsEl.getElementsByTagName("pt")) : [];
+        const waypoints = waypointElements
+          .map((ptEl) => ({
+            x: parseNullableNumberAttr(ptEl.getAttribute("x")),
+            y: parseNullableNumberAttr(ptEl.getAttribute("y"))
+          }))
+          .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
         edge.route = normalizeEdgeRoute({
-          type: edgeEl.getAttribute("routeType") || defaultEdgeRoute.type,
+          type: edgeEl.getAttribute("routing") || edgeEl.getAttribute("routeType") || defaultEdgeRoute.type,
+          snapToGrid: parseBooleanAttr(edgeEl.getAttribute("snapRouting"), defaultEdgeRoute.snapToGrid),
           cornerRadius: parseNumberAttr(edgeEl.getAttribute("cornerRadius"), defaultEdgeRoute.cornerRadius),
           bend: parseNullableNumberAttr(edgeEl.getAttribute("bend")),
           controlX: parseNullableNumberAttr(edgeEl.getAttribute("controlX")),
-          controlY: parseNullableNumberAttr(edgeEl.getAttribute("controlY"))
+          controlY: parseNullableNumberAttr(edgeEl.getAttribute("controlY")),
+          waypoints
         });
 
         const labelEl = edgeEl.getElementsByTagName("label")[0];
         if (labelEl) {
-          edge.label = {
-            text: labelEl.textContent || "",
+          const offsetRaw = labelEl.getAttribute("offset") || "";
+          const [offsetXRaw, offsetYRaw] = offsetRaw.split(",");
+          edge.label = normalizeEdgeLabel({
+            text: labelEl.getAttribute("text") ?? labelEl.textContent ?? "",
+            fontFamily: labelEl.getAttribute("fontFamily") || defaultEdgeLabel.fontFamily,
             fontSize: Math.max(8, parseNumberAttr(labelEl.getAttribute("fontSize"), defaultEdgeLabel.fontSize)),
             color: sanitizeColor(labelEl.getAttribute("color"), defaultEdgeLabel.color),
-            offsetX: parseNumberAttr(labelEl.getAttribute("offsetX"), 0),
-            offsetY: parseNumberAttr(labelEl.getAttribute("offsetY"), 0)
-          };
+            bold: parseBooleanAttr(labelEl.getAttribute("bold"), defaultEdgeLabel.bold),
+            italic: parseBooleanAttr(labelEl.getAttribute("italic"), defaultEdgeLabel.italic),
+            underline: parseBooleanAttr(labelEl.getAttribute("underline"), defaultEdgeLabel.underline),
+            align: labelEl.getAttribute("align") || defaultEdgeLabel.align,
+            backgroundColor: sanitizeColor(
+              labelEl.getAttribute("background") || labelEl.getAttribute("backgroundColor"),
+              defaultEdgeLabel.backgroundColor
+            ),
+            borderColor: sanitizeColor(
+              labelEl.getAttribute("border") || labelEl.getAttribute("borderColor"),
+              defaultEdgeLabel.borderColor
+            ),
+            borderWidth: parseNumberAttr(labelEl.getAttribute("borderWidth"), defaultEdgeLabel.borderWidth),
+            padding: parseNumberAttr(labelEl.getAttribute("padding"), defaultEdgeLabel.padding),
+            position: parseNumberAttr(labelEl.getAttribute("position"), defaultEdgeLabel.position),
+            normalOffset: parseNumberAttr(labelEl.getAttribute("normalOffset"), defaultEdgeLabel.normalOffset),
+            offsetX: parseNumberAttr(
+              labelEl.getAttribute("offsetX"),
+              parseNumberAttr(offsetXRaw, defaultEdgeLabel.offsetX)
+            ),
+            offsetY: parseNumberAttr(
+              labelEl.getAttribute("offsetY"),
+              parseNumberAttr(offsetYRaw, defaultEdgeLabel.offsetY)
+            )
+          });
         }
 
         usedEdgeIds.add(id);
@@ -2456,10 +3499,12 @@
   function normalizeImportedDoc(doc) {
     doc.nodes.forEach((node, index) => {
       node.type = isSupportedNodeType(node.type) ? node.type : "dikdortgen";
+      const minW = node.type === "junction" ? 12 : MIN_NODE_W;
+      const minH = node.type === "junction" ? 12 : MIN_NODE_H;
       node.x = Number.isFinite(node.x) ? node.x : 0;
       node.y = Number.isFinite(node.y) ? node.y : 0;
-      node.w = Math.max(MIN_NODE_W, Number.isFinite(node.w) ? node.w : 120);
-      node.h = Math.max(MIN_NODE_H, Number.isFinite(node.h) ? node.h : 60);
+      node.w = Math.max(minW, Number.isFinite(node.w) ? node.w : node.type === "junction" ? 18 : 120);
+      node.h = Math.max(minH, Number.isFinite(node.h) ? node.h : node.type === "junction" ? 18 : 60);
       node.zIndex = Number.isFinite(node.zIndex) ? node.zIndex : index + 1;
       node.text = typeof node.text === "string" ? node.text : "";
 
@@ -2494,36 +3539,11 @@
     });
 
     doc.edges.forEach((edge) => {
-      edge.from = edge.from || { nodeId: null, anchor: "right", point: null };
-      edge.to = edge.to || { nodeId: null, anchor: "left", point: null };
-      edge.from.anchor = normalizeAnchor(edge.from.anchor);
-      edge.to.anchor = normalizeAnchor(edge.to.anchor);
-      edge.from.nodeId = edge.from?.nodeId || null;
-      edge.to.nodeId = edge.to?.nodeId || null;
-      if (edge.from?.point && Number.isFinite(Number(edge.from.point.x)) && Number.isFinite(Number(edge.from.point.y))) {
-        edge.from.point = { x: snapAlways(Number(edge.from.point.x)), y: snapAlways(Number(edge.from.point.y)) };
-      } else {
-        edge.from.point = null;
-      }
-      if (edge.to?.point && Number.isFinite(Number(edge.to.point.x)) && Number.isFinite(Number(edge.to.point.y))) {
-        edge.to.point = { x: snapAlways(Number(edge.to.point.x)), y: snapAlways(Number(edge.to.point.y)) };
-      } else {
-        edge.to.point = null;
-      }
-      edge.style = {
-        stroke: sanitizeColor(edge.style?.stroke, defaultEdgeStyle.stroke),
-        strokeWidth: Math.max(1, Number(edge.style?.strokeWidth) || defaultEdgeStyle.strokeWidth),
-        dashed: Boolean(edge.style?.dashed),
-        arrow: edge.style?.arrow !== false
-      };
+      edge.from = normalizeEdgeEndpoint(edge.from, "right");
+      edge.to = normalizeEdgeEndpoint(edge.to, "left");
+      edge.style = normalizeEdgeStyle(edge.style);
       edge.route = normalizeEdgeRoute(edge.route);
-      edge.label = {
-        text: typeof edge.label?.text === "string" ? edge.label.text : "",
-        fontSize: Math.max(8, Number(edge.label?.fontSize) || defaultEdgeLabel.fontSize),
-        color: sanitizeColor(edge.label?.color, defaultEdgeLabel.color),
-        offsetX: Number.isFinite(Number(edge.label?.offsetX)) ? Number(edge.label.offsetX) : 0,
-        offsetY: Number.isFinite(Number(edge.label?.offsetY)) ? Number(edge.label.offsetY) : 0
-      };
+      edge.label = normalizeEdgeLabel(edge.label);
     });
 
     const normalizedGroups = [];
@@ -2927,7 +3947,7 @@
     },
 
     deleteSelection() {
-      if (!state.selectedNodeIds.size && !state.selectedEdgeId && !state.selectedGroupId) {
+      if (!state.selectedNodeIds.size && !state.selectedEdgeIds.size && !state.selectedGroupId) {
         return;
       }
 
@@ -2948,8 +3968,9 @@
           }
         }
 
-        if (state.selectedEdgeId) {
-          state.doc.edges = state.doc.edges.filter((edge) => edge.id !== state.selectedEdgeId);
+        if (state.selectedEdgeIds.size) {
+          const edgeIds = new Set(state.selectedEdgeIds);
+          state.doc.edges = state.doc.edges.filter((edge) => !edgeIds.has(edge.id));
         }
 
         if (state.selectedGroupId && Array.isArray(state.doc.groups)) {
@@ -2966,7 +3987,11 @@
     copySelection() {
       const selectedNodes = state.doc.nodes.filter((node) => state.selectedNodeIds.has(node.id));
       if (!selectedNodes.length) {
-        showToast("Kopyalamak için en az bir blok seçin.", "error");
+        if (state.selectedEdgeIds.size) {
+          showToast("Edge kopyalama desteklenmiyor.", "info");
+        } else {
+          showToast("Kopyalamak için en az bir blok seçin.", "error");
+        }
         return;
       }
 
@@ -3021,6 +4046,7 @@
         state.doc.nodes.push(...pastedNodes);
         state.doc.edges.push(...pastedEdges);
         state.selectedNodeIds = new Set(pastedNodes.map((node) => node.id));
+        state.selectedEdgeIds.clear();
         state.selectedEdgeId = null;
       });
 
@@ -3060,6 +4086,7 @@
         }
         state.doc.groups.push(group);
         state.selectedNodeIds.clear();
+        state.selectedEdgeIds.clear();
         state.selectedEdgeId = null;
         state.selectedGroupId = group.id;
       });
@@ -3140,6 +4167,7 @@
         state.doc.nodes.push(newNode);
         const anchors = getDirectionAnchors(direction);
         const edge = createEdge(sourceNode.id, anchors.from, newNode.id, anchors.to);
+        applyDefaultConnectorStyle(edge);
         edge.route.bend = null;
         state.doc.edges.push(edge);
         selectSingleNode(newNode.id);
@@ -3340,9 +4368,9 @@
     updateToolbarState() {
       refs.btnGeriAl.disabled = state.history.undo.length === 0;
       refs.btnYinele.disabled = state.history.redo.length === 0;
-      refs.btnKopyala.disabled = state.selectedNodeIds.size === 0;
+      refs.btnKopyala.disabled = state.selectedNodeIds.size === 0 && state.selectedEdgeIds.size === 0;
       refs.btnSil.disabled =
-        state.selectedNodeIds.size === 0 && !state.selectedEdgeId && !state.selectedGroupId;
+        state.selectedNodeIds.size === 0 && state.selectedEdgeIds.size === 0 && !state.selectedGroupId;
       if (refs.btnGrupla) {
         refs.btnGrupla.hidden = state.selectedNodeIds.size < 2;
       }
@@ -3408,25 +4436,61 @@
         refs.propRadius.value = selectedGroup.shapeStyle.radius;
         refs.propW.value = Math.round(frame.w);
         refs.propH.value = Math.round(frame.h);
-      } else if (selectedEdge) {
+      } else if (selectedEdge && state.selectedEdgeIds.size <= 1) {
+        ensureEdgeDefaults(selectedEdge);
+        const route = normalizeEdgeRoute(selectedEdge.route);
+        const style = normalizeEdgeStyle(selectedEdge.style);
+        const label = normalizeEdgeLabel(selectedEdge.label);
         refs.secimBilgi.textContent = `Seçili bağlantı: ${selectedEdge.id}`;
         refs.baglantiOzellikleri.hidden = false;
-        const route = normalizeEdgeRoute(selectedEdge.route);
+        refs.propEdgeRoute.value = route.type;
+        refs.propEdgeCornerStyle.value = style.cornerStyle;
+        refs.propEdgeCornerRadius.value = route.cornerRadius;
+        refs.propEdgeCornerRadius.disabled = style.cornerStyle === "sharp";
+        refs.propEdgeEndpointMode.value = selectedEdge.from.mode === "fixed" || selectedEdge.to.mode === "fixed" ? "fixed" : "floating";
+        refs.propEdgeSnapRouting.checked = route.snapToGrid;
 
-        refs.propEdgeStroke.value = selectedEdge.style.stroke;
-        refs.propEdgeStrokeWidth.value = selectedEdge.style.strokeWidth;
-        refs.propEdgeDashed.checked = Boolean(selectedEdge.style.dashed);
-        refs.propEdgeArrow.checked = Boolean(selectedEdge.style.arrow);
-        if (refs.propEdgeType) {
-          refs.propEdgeType.value = route.type;
-        }
-        if (refs.propEdgeCornerRadius) {
-          refs.propEdgeCornerRadius.value = route.cornerRadius;
-          refs.propEdgeCornerRadius.disabled = route.type !== "orthogonal";
-        }
-        refs.propEdgeLabel.value = selectedEdge.label.text;
-        refs.propEdgeLabelSize.value = selectedEdge.label.fontSize;
-        refs.propEdgeLabelColor.value = selectedEdge.label.color;
+        refs.propEdgeStroke.value = style.stroke;
+        refs.propEdgeStrokeWidth.value = style.strokeWidth;
+        refs.propEdgePattern.value = style.pattern;
+        refs.propEdgeOpacity.value = style.opacity;
+        refs.propEdgeDashLength.value = style.dashLength;
+        refs.propEdgeGapLength.value = style.gapLength;
+        refs.propEdgeShadow.checked = style.shadow;
+        refs.propEdgeSketch.checked = style.sketch;
+
+        refs.propEdgeStartArrow.value = style.startArrow;
+        refs.propEdgeEndArrow.value = style.endArrow;
+        refs.propEdgeStartSize.value = style.startSize;
+        refs.propEdgeEndSize.value = style.endSize;
+        refs.propEdgeStartSpacing.value = style.startSpacing;
+        refs.propEdgeEndSpacing.value = style.endSpacing;
+        refs.propEdgeArrowFill.checked = style.arrowFill;
+
+        refs.propEdgeJumpStyle.value = style.jumpStyle;
+        refs.propEdgeJumpSize.value = style.jumpSize;
+
+        refs.propEdgeLabel.value = label.text;
+        refs.propEdgeLabelPosition.value = Math.round(label.position * 100);
+        refs.propEdgeLabelOffsetX.value = label.offsetX;
+        refs.propEdgeLabelOffsetY.value = label.offsetY;
+        refs.propEdgeLabelFontFamily.value = label.fontFamily;
+        refs.propEdgeLabelSize.value = label.fontSize;
+        refs.propEdgeLabelColor.value = label.color;
+        refs.propEdgeLabelBold.checked = label.bold;
+        refs.propEdgeLabelItalic.checked = label.italic;
+        refs.propEdgeLabelUnderline.checked = label.underline;
+        refs.propEdgeLabelAlign.value = label.align;
+        refs.propEdgeLabelBackground.value = label.backgroundColor;
+        refs.propEdgeLabelBorder.value = label.borderColor;
+        refs.propEdgeLabelBorderWidth.value = label.borderWidth;
+        refs.propEdgeLabelPadding.value = label.padding;
+
+        refs.propEdgeFlowEnabled.checked = style.flowEnabled;
+        refs.propEdgeFlowSpeed.value = style.flowSpeed;
+        refs.propEdgeFlowDirection.value = style.flowDirection;
+      } else if (state.selectedEdgeIds.size > 1) {
+        refs.secimBilgi.textContent = `${state.selectedEdgeIds.size} bağlantı seçili.`;
       } else if (selectedNodes.length > 1) {
         refs.secimBilgi.textContent = `${selectedNodes.length} blok seçili.`;
       } else {
@@ -3457,7 +4521,7 @@
       return;
     }
 
-    if (!state.selectedGroupId || state.selectedEdgeId || state.selectedNodeIds.size) {
+    if (!state.selectedGroupId || state.selectedEdgeIds.size || state.selectedNodeIds.size) {
       return;
     }
 
@@ -3517,16 +4581,25 @@
   }
 
   function mutateSelectedEdge(mutator) {
-    if (state.panelSync || !state.selectedEdgeId) {
+    if (state.panelSync || (!state.selectedEdgeId && !state.selectedEdgeIds.size)) {
       return;
     }
-    const edge = getEdgeById(state.selectedEdgeId);
-    if (!edge) {
+    const targetEdgeIds = state.selectedEdgeIds.size
+      ? [...state.selectedEdgeIds]
+      : state.selectedEdgeId
+        ? [state.selectedEdgeId]
+        : [];
+    const edges = targetEdgeIds.map((edgeId) => getEdgeById(edgeId)).filter(Boolean);
+    if (!edges.length) {
       return;
     }
 
     withHistory(() => {
-      mutator(edge);
+      edges.forEach((edge) => {
+        ensureEdgeDefaults(edge);
+        mutator(edge);
+        ensureEdgeDefaults(edge);
+      });
     });
 
     Renderer.requestRender();
@@ -3576,6 +4649,7 @@
     } else {
       hitNodeIds.forEach((nodeId) => state.selectedNodeIds.add(nodeId));
     }
+    state.selectedEdgeIds.clear();
     state.selectedEdgeId = null;
     state.selectedGroupId = null;
   }
@@ -3604,6 +4678,7 @@
     }
 
     state.selectedNodeIds.clear();
+    state.selectedEdgeIds.clear();
     state.selectedEdgeId = null;
     state.selectedGroupId = groupId;
     closeQuickPalette();
@@ -3729,6 +4804,29 @@
     };
   }
 
+  function startEdgeWaypointDrag(event, edgeId, waypointIndex) {
+    const edge = getEdgeById(edgeId);
+    const route = edge ? normalizeEdgeRoute(edge.route) : null;
+    if (!edge || !route || !Number.isInteger(waypointIndex) || waypointIndex < 0 || waypointIndex >= route.waypoints.length) {
+      return;
+    }
+    if (state.selectedEdgeId !== edgeId) {
+      selectSingleEdge(edgeId);
+      UI.updatePropertiesPanel();
+    }
+
+    History.begin();
+    state.interaction.mode = "edge-waypoint";
+    state.interaction.pointerId = event.pointerId;
+    state.interaction.startWorld = getWorldPointFromEvent(event);
+    state.interaction.currentWorld = state.interaction.startWorld;
+    state.interaction.moved = false;
+    state.interaction.edgeWaypoint = {
+      edgeId,
+      waypointIndex
+    };
+  }
+
   function startConnect(event, nodeId, anchor) {
     const node = getNodeById(nodeId);
     if (!node) {
@@ -3785,6 +4883,7 @@
     state.interaction.edgeHandle = null;
     state.interaction.edgeEndpoint = null;
     state.interaction.edgeLabel = null;
+    state.interaction.edgeWaypoint = null;
     state.interaction.connectFrom = null;
     state.interaction.marqueeAdditive = false;
     document.body.classList.remove("dragging-edge-handle");
@@ -3797,6 +4896,7 @@
     const groupItemEl = event.target.closest(".group-item");
     const edgeControlEl = event.target.closest(".edge-control-handle");
     const edgeEndpointEl = event.target.closest(".edge-endpoint-handle");
+    const edgeWaypointEl = event.target.closest(".edge-waypoint-handle");
     const edgeLabelEl = event.target.closest(".edge-label[data-edge-label='1']");
     const handleEl = event.target.closest(".resize-handle");
     const anchorEl = event.target.closest(".anchor");
@@ -3812,6 +4912,7 @@
         !groupItemEl &&
         !edgeControlEl &&
         !edgeEndpointEl &&
+        !edgeWaypointEl &&
         !edgeLabelEl &&
         !handleEl &&
         !anchorEl &&
@@ -3827,6 +4928,8 @@
     if (event.button !== 0) {
       return;
     }
+
+    hideEdgeContextMenu();
 
     if (quickArrowEl) {
       event.preventDefault();
@@ -3876,6 +4979,17 @@
         event,
         edgeEndpointEl.getAttribute("data-edge-id"),
         edgeEndpointEl.getAttribute("data-end")
+      );
+      Renderer.requestRender();
+      return;
+    }
+
+    if (edgeWaypointEl) {
+      event.preventDefault();
+      startEdgeWaypointDrag(
+        event,
+        edgeWaypointEl.getAttribute("data-edge-id"),
+        Number(edgeWaypointEl.getAttribute("data-waypoint-index"))
       );
       Renderer.requestRender();
       return;
@@ -3935,7 +5049,11 @@
         return;
       }
       event.preventDefault();
-      selectSingleEdge(edgeId);
+      if (event.shiftKey) {
+        toggleEdgeSelection(edgeId);
+      } else {
+        selectSingleEdge(edgeId);
+      }
       UI.updatePropertiesPanel();
       Renderer.requestRender();
       return;
@@ -4089,14 +5207,18 @@
       const route = normalizeEdgeRoute(edge.route);
       if (state.interaction.edgeHandle.handleKind === "curve-control") {
         route.type = "curved";
-        route.controlX = snapAlways(world.x);
-        route.controlY = snapAlways(world.y);
+        route.controlX = route.snapToGrid && state.ui.snapToGrid ? snapAlways(world.x) : world.x;
+        route.controlY = route.snapToGrid && state.ui.snapToGrid ? snapAlways(world.y) : world.y;
       } else {
         route.type = "orthogonal";
         route.bend =
           state.interaction.edgeHandle.axis === "y"
-            ? snapAlways(world.y)
-            : snapAlways(world.x);
+            ? route.snapToGrid && state.ui.snapToGrid
+              ? snapAlways(world.y)
+              : world.y
+            : route.snapToGrid && state.ui.snapToGrid
+              ? snapAlways(world.x)
+              : world.x;
       }
 
       edge.route = route;
@@ -4117,6 +5239,27 @@
       const end = edge[state.interaction.edgeEndpoint.endKey];
       end.nodeId = null;
       end.point = snapped;
+      end.customPointId = null;
+      state.interaction.moved = true;
+      Renderer.requestRender();
+      return;
+    }
+
+    if (state.interaction.mode === "edge-waypoint" && state.interaction.edgeWaypoint) {
+      const edge = getEdgeById(state.interaction.edgeWaypoint.edgeId);
+      if (!edge) {
+        return;
+      }
+      const route = normalizeEdgeRoute(edge.route);
+      const index = state.interaction.edgeWaypoint.waypointIndex;
+      if (index < 0 || index >= route.waypoints.length) {
+        return;
+      }
+      route.waypoints[index] = {
+        x: route.snapToGrid && state.ui.snapToGrid ? snapAlways(world.x) : world.x,
+        y: route.snapToGrid && state.ui.snapToGrid ? snapAlways(world.y) : world.y
+      };
+      edge.route = route;
       state.interaction.moved = true;
       Renderer.requestRender();
       return;
@@ -4297,6 +5440,18 @@
       return;
     }
 
+    if (state.interaction.mode === "edge-waypoint") {
+      if (state.interaction.moved) {
+        History.commit();
+      } else {
+        History.cancel();
+      }
+      UI.updatePropertiesPanel();
+      Renderer.requestRender();
+      resetInteraction();
+      return;
+    }
+
     if (state.interaction.mode === "edge-label") {
       if (state.interaction.moved) {
         History.commit();
@@ -4319,6 +5474,7 @@
 
         if (toNodeId && getNodeById(toNodeId)) {
           const edge = createEdge(from.nodeId, from.anchor, toNodeId, toAnchor);
+          applyDefaultConnectorStyle(edge);
           state.doc.edges.push(edge);
           selectSingleEdge(edge.id);
           created = true;
@@ -4354,6 +5510,226 @@
       Renderer.requestRender();
       resetInteraction();
     }
+  }
+
+  function hideEdgeContextMenu() {
+    if (!refs.edgeContextMenu) {
+      return;
+    }
+    refs.edgeContextMenu.hidden = true;
+    state.contextMenu.edgeId = null;
+    state.contextMenu.waypointIndex = -1;
+    state.contextMenu.worldPoint = null;
+  }
+
+  function showEdgeContextMenu(edgeId, waypointIndex, worldPoint, clientX, clientY) {
+    if (!refs.edgeContextMenu || !edgeId) {
+      return;
+    }
+    state.contextMenu.edgeId = edgeId;
+    state.contextMenu.waypointIndex = Number.isInteger(waypointIndex) ? waypointIndex : -1;
+    state.contextMenu.worldPoint = worldPoint;
+    refs.edgeContextMenu.hidden = false;
+    const menuRect = refs.edgeContextMenu.getBoundingClientRect();
+    const margin = 8;
+    const x = clamp(clientX, margin, window.innerWidth - menuRect.width - margin);
+    const y = clamp(clientY, margin, window.innerHeight - menuRect.height - margin);
+    refs.edgeContextMenu.style.left = `${x}px`;
+    refs.edgeContextMenu.style.top = `${y}px`;
+  }
+
+  function addWaypointToEdge(edgeId, worldPoint) {
+    const edge = getEdgeById(edgeId);
+    if (!edge || !worldPoint) {
+      return;
+    }
+    withHistory(() => {
+      const route = normalizeEdgeRoute(edge.route);
+      const geometry = getEdgeGeometry(edge);
+      if (!geometry || geometry.points.length < 2) {
+        return;
+      }
+      const insertAt = findClosestSegmentIndex(geometry.points, worldPoint);
+      const point = route.snapToGrid && state.ui.snapToGrid
+        ? { x: snapAlways(worldPoint.x), y: snapAlways(worldPoint.y) }
+        : { x: worldPoint.x, y: worldPoint.y };
+      route.waypoints.splice(insertAt, 0, point);
+      if (!["orthogonal", "simple", "straight", "isometric", "entityRelation"].includes(route.type)) {
+        route.type = "orthogonal";
+      }
+      edge.route = route;
+    });
+    Renderer.requestRender();
+    UI.updatePropertiesPanel();
+  }
+
+  function deleteWaypointFromEdge(edgeId, waypointIndex, worldPoint) {
+    const edge = getEdgeById(edgeId);
+    if (!edge) {
+      return;
+    }
+    withHistory(() => {
+      const route = normalizeEdgeRoute(edge.route);
+      let index = Number.isInteger(waypointIndex) ? waypointIndex : -1;
+      if (index < 0 && worldPoint) {
+        let best = 0;
+        let bestDist = Number.POSITIVE_INFINITY;
+        route.waypoints.forEach((waypoint, i) => {
+          const distance = Math.hypot(waypoint.x - worldPoint.x, waypoint.y - worldPoint.y);
+          if (distance < bestDist) {
+            bestDist = distance;
+            best = i;
+          }
+        });
+        index = bestDist < 20 ? best : -1;
+      }
+      if (index >= 0 && index < route.waypoints.length) {
+        route.waypoints.splice(index, 1);
+        edge.route = route;
+      }
+    });
+    Renderer.requestRender();
+    UI.updatePropertiesPanel();
+  }
+
+  function reverseEdge(edgeId) {
+    const edge = getEdgeById(edgeId);
+    if (!edge) {
+      return;
+    }
+    withHistory(() => {
+      const from = cloneDeep(edge.from);
+      edge.from = cloneDeep(edge.to);
+      edge.to = from;
+      const route = normalizeEdgeRoute(edge.route);
+      route.waypoints = [...route.waypoints].reverse();
+      edge.route = route;
+    });
+    Renderer.requestRender();
+    UI.updatePropertiesPanel();
+  }
+
+  function editEdgeLabel(edgeId) {
+    const edge = getEdgeById(edgeId);
+    if (!edge) {
+      return;
+    }
+    const current = edge.label?.text || "";
+    const next = window.prompt("Bağlantı etiketi:", current);
+    if (next === null) {
+      return;
+    }
+    withHistory(() => {
+      edge.label = normalizeEdgeLabel(edge.label);
+      edge.label.text = next;
+    });
+    Renderer.requestRender();
+    UI.updatePropertiesPanel();
+  }
+
+  function copyEdgeStyle(edgeId) {
+    const edge = getEdgeById(edgeId);
+    if (!edge) {
+      return;
+    }
+    const route = normalizeEdgeRoute(edge.route);
+    const label = normalizeEdgeLabel(edge.label);
+    state.edgeStyleClipboard = {
+      style: normalizeEdgeStyle(edge.style),
+      route: {
+        type: route.type,
+        snapToGrid: route.snapToGrid,
+        cornerRadius: route.cornerRadius,
+        bend: null,
+        controlX: null,
+        controlY: null,
+        waypoints: []
+      },
+      label: {
+        ...label,
+        text: ""
+      }
+    };
+    showToast("Bağlantı stili kopyalandı.", "success");
+  }
+
+  function pasteEdgeStyle(edgeId) {
+    const edge = getEdgeById(edgeId);
+    if (!edge || !state.edgeStyleClipboard) {
+      showToast("Yapıştırılacak bir bağlantı stili yok.", "error");
+      return;
+    }
+    withHistory(() => {
+      const currentText = edge.label?.text || "";
+      const currentRoute = normalizeEdgeRoute(edge.route);
+      edge.style = normalizeEdgeStyle(cloneDeep(state.edgeStyleClipboard.style));
+      edge.route = normalizeEdgeRoute({
+        ...cloneDeep(state.edgeStyleClipboard.route),
+        bend: currentRoute.bend,
+        controlX: currentRoute.controlX,
+        controlY: currentRoute.controlY,
+        waypoints: currentRoute.waypoints
+      });
+      edge.label = normalizeEdgeLabel(cloneDeep(state.edgeStyleClipboard.label));
+      edge.label.text = currentText;
+    });
+    Renderer.requestRender();
+    UI.updatePropertiesPanel();
+  }
+
+  function setDefaultConnectorStyleFromEdge(edgeId) {
+    const edge = getEdgeById(edgeId);
+    if (!edge) {
+      return;
+    }
+    const route = normalizeEdgeRoute(edge.route);
+    const label = normalizeEdgeLabel(edge.label);
+    state.defaultConnectorStyle = {
+      style: normalizeEdgeStyle(cloneDeep(edge.style)),
+      route: {
+        type: route.type,
+        snapToGrid: route.snapToGrid,
+        cornerRadius: route.cornerRadius,
+        bend: null,
+        controlX: null,
+        controlY: null,
+        waypoints: []
+      },
+      label: {
+        ...label,
+        text: ""
+      }
+    };
+    showToast("Varsayılan bağlantı stili güncellendi.", "success");
+  }
+
+  function onCanvasContextMenu(event) {
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      hideEdgeContextMenu();
+      return;
+    }
+    const waypointEl = target.closest(".edge-waypoint-handle");
+    const edgeEl = target.closest(".edge");
+    const edgeId =
+      waypointEl?.getAttribute("data-edge-id") ||
+      edgeEl?.getAttribute("data-edge-id") ||
+      target.getAttribute("data-edge-id");
+    if (!edgeId) {
+      hideEdgeContextMenu();
+      return;
+    }
+    event.preventDefault();
+    const waypointIndex = waypointEl ? Number(waypointEl.getAttribute("data-waypoint-index")) : -1;
+    const worldPoint = getWorldPointFromEvent(event);
+    if (!state.selectedEdgeIds.has(edgeId)) {
+      selectSingleEdge(edgeId);
+      UI.updatePropertiesPanel();
+      Renderer.requestRender();
+    } else {
+      state.selectedEdgeId = edgeId;
+    }
+    showEdgeContextMenu(edgeId, waypointIndex, worldPoint, event.clientX, event.clientY);
   }
 
   function bindToolbarEvents() {
@@ -4399,7 +5775,7 @@
           showToast("XML başarıyla içe aktarıldı.", "success");
         } catch (error) {
           console.error(error);
-          showToast(`XML okunamadı: ${error.message}`, "error");
+          showToast(`Edge import edilemedi: ${error.message}`, "error");
         }
       };
       reader.onerror = () => {
@@ -4576,53 +5952,147 @@
       UI.updatePropertiesPanel();
     });
 
+    refs.propEdgeRoute.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        const route = normalizeEdgeRoute(edge.route);
+        route.type = normalizeEdgeType(refs.propEdgeRoute.value);
+        edge.route = route;
+      });
+      UI.updatePropertiesPanel();
+    });
+
+    refs.propEdgeCornerStyle.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        edge.style.cornerStyle = normalizeEdgeCornerStyle(refs.propEdgeCornerStyle.value);
+      });
+      UI.updatePropertiesPanel();
+    });
+
+    refs.propEdgeCornerRadius.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        const route = normalizeEdgeRoute(edge.route);
+        route.cornerRadius = clamp(Number(refs.propEdgeCornerRadius.value) || 0, 0, 80);
+        edge.route = route;
+      });
+    });
+
+    refs.propEdgeEndpointMode.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        const mode = refs.propEdgeEndpointMode.value === "fixed" ? "fixed" : "floating";
+        edge.from.mode = mode;
+        edge.to.mode = mode;
+      });
+    });
+
+    refs.propEdgeSnapRouting.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        const route = normalizeEdgeRoute(edge.route);
+        route.snapToGrid = refs.propEdgeSnapRouting.checked;
+        edge.route = route;
+      });
+    });
+
     refs.propEdgeStroke.addEventListener("change", () => {
       mutateSelectedEdge((edge) => {
-        edge.style.stroke = refs.propEdgeStroke.value;
+        edge.style.stroke = sanitizeColor(refs.propEdgeStroke.value, edge.style.stroke);
       });
     });
 
     refs.propEdgeStrokeWidth.addEventListener("change", () => {
       mutateSelectedEdge((edge) => {
-        edge.style.strokeWidth = clamp(Number(refs.propEdgeStrokeWidth.value) || 1, 1, 12);
+        edge.style.strokeWidth = clamp(Number(refs.propEdgeStrokeWidth.value) || 1, 1, 20);
       });
     });
 
-    refs.propEdgeDashed.addEventListener("change", () => {
+    refs.propEdgePattern.addEventListener("change", () => {
       mutateSelectedEdge((edge) => {
-        edge.style.dashed = refs.propEdgeDashed.checked;
+        edge.style.pattern = normalizeEdgePattern(refs.propEdgePattern.value);
       });
     });
 
-    refs.propEdgeArrow.addEventListener("change", () => {
+    refs.propEdgeOpacity.addEventListener("change", () => {
       mutateSelectedEdge((edge) => {
-        edge.style.arrow = refs.propEdgeArrow.checked;
+        edge.style.opacity = clamp(Number(refs.propEdgeOpacity.value) || 1, 0, 1);
       });
     });
 
-    if (refs.propEdgeType) {
-      refs.propEdgeType.addEventListener("change", () => {
-        mutateSelectedEdge((edge) => {
-          const route = normalizeEdgeRoute(edge.route);
-          route.type = normalizeEdgeType(refs.propEdgeType.value);
-          if (route.type !== "orthogonal") {
-            route.cornerRadius = 0;
-          }
-          edge.route = route;
-        });
-        UI.updatePropertiesPanel();
+    refs.propEdgeDashLength.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        edge.style.dashLength = clamp(Number(refs.propEdgeDashLength.value) || 8, 1, 40);
       });
-    }
+    });
 
-    if (refs.propEdgeCornerRadius) {
-      refs.propEdgeCornerRadius.addEventListener("change", () => {
-        mutateSelectedEdge((edge) => {
-          const route = normalizeEdgeRoute(edge.route);
-          route.cornerRadius = clamp(Number(refs.propEdgeCornerRadius.value) || 0, 0, 60);
-          edge.route = route;
-        });
+    refs.propEdgeGapLength.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        edge.style.gapLength = clamp(Number(refs.propEdgeGapLength.value) || 6, 1, 40);
       });
-    }
+    });
+
+    refs.propEdgeShadow.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        edge.style.shadow = refs.propEdgeShadow.checked;
+      });
+    });
+
+    refs.propEdgeSketch.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        edge.style.sketch = refs.propEdgeSketch.checked;
+      });
+    });
+
+    refs.propEdgeStartArrow.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        edge.style.startArrow = normalizeEdgeArrow(refs.propEdgeStartArrow.value);
+      });
+    });
+
+    refs.propEdgeEndArrow.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        edge.style.endArrow = normalizeEdgeArrow(refs.propEdgeEndArrow.value);
+      });
+    });
+
+    refs.propEdgeStartSize.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        edge.style.startSize = clamp(Number(refs.propEdgeStartSize.value) || 10, 4, 48);
+      });
+    });
+
+    refs.propEdgeEndSize.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        edge.style.endSize = clamp(Number(refs.propEdgeEndSize.value) || 10, 4, 48);
+      });
+    });
+
+    refs.propEdgeStartSpacing.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        edge.style.startSpacing = clamp(Number(refs.propEdgeStartSpacing.value) || 0, -40, 40);
+      });
+    });
+
+    refs.propEdgeEndSpacing.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        edge.style.endSpacing = clamp(Number(refs.propEdgeEndSpacing.value) || 0, -40, 40);
+      });
+    });
+
+    refs.propEdgeArrowFill.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        edge.style.arrowFill = refs.propEdgeArrowFill.checked;
+      });
+    });
+
+    refs.propEdgeJumpStyle.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        edge.style.jumpStyle = normalizeEdgeJump(refs.propEdgeJumpStyle.value);
+      });
+    });
+
+    refs.propEdgeJumpSize.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        edge.style.jumpSize = clamp(Number(refs.propEdgeJumpSize.value) || 8, 2, 40);
+      });
+    });
 
     refs.propEdgeLabel.addEventListener("input", () => {
       mutateSelectedEdge((edge) => {
@@ -4630,21 +6100,114 @@
       });
     });
 
+    refs.propEdgeLabelPosition.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        edge.label.position = clamp((Number(refs.propEdgeLabelPosition.value) || 50) / 100, 0, 1);
+      });
+    });
+
+    refs.propEdgeLabelOffsetX.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        edge.label.offsetX = Number(refs.propEdgeLabelOffsetX.value) || 0;
+      });
+    });
+
+    refs.propEdgeLabelOffsetY.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        edge.label.offsetY = Number(refs.propEdgeLabelOffsetY.value) || 0;
+      });
+    });
+
+    refs.propEdgeLabelFontFamily.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        edge.label.fontFamily = refs.propEdgeLabelFontFamily.value || defaultEdgeLabel.fontFamily;
+      });
+    });
+
     refs.propEdgeLabelSize.addEventListener("change", () => {
       mutateSelectedEdge((edge) => {
-        edge.label.fontSize = clamp(Number(refs.propEdgeLabelSize.value) || 12, 8, 40);
+        edge.label.fontSize = clamp(Number(refs.propEdgeLabelSize.value) || 12, 8, 48);
       });
     });
 
     refs.propEdgeLabelColor.addEventListener("change", () => {
       mutateSelectedEdge((edge) => {
-        edge.label.color = refs.propEdgeLabelColor.value;
+        edge.label.color = sanitizeColor(refs.propEdgeLabelColor.value, edge.label.color);
+      });
+    });
+
+    refs.propEdgeLabelBold.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        edge.label.bold = refs.propEdgeLabelBold.checked;
+      });
+    });
+
+    refs.propEdgeLabelItalic.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        edge.label.italic = refs.propEdgeLabelItalic.checked;
+      });
+    });
+
+    refs.propEdgeLabelUnderline.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        edge.label.underline = refs.propEdgeLabelUnderline.checked;
+      });
+    });
+
+    refs.propEdgeLabelAlign.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        edge.label.align = ["left", "center", "right"].includes(refs.propEdgeLabelAlign.value)
+          ? refs.propEdgeLabelAlign.value
+          : "center";
+      });
+    });
+
+    refs.propEdgeLabelBackground.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        edge.label.backgroundColor = sanitizeColor(refs.propEdgeLabelBackground.value, edge.label.backgroundColor);
+      });
+    });
+
+    refs.propEdgeLabelBorder.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        edge.label.borderColor = sanitizeColor(refs.propEdgeLabelBorder.value, edge.label.borderColor);
+      });
+    });
+
+    refs.propEdgeLabelBorderWidth.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        edge.label.borderWidth = clamp(Number(refs.propEdgeLabelBorderWidth.value) || 0, 0, 10);
+      });
+    });
+
+    refs.propEdgeLabelPadding.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        edge.label.padding = clamp(Number(refs.propEdgeLabelPadding.value) || 0, 0, 24);
+      });
+    });
+
+    refs.propEdgeFlowEnabled.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        edge.style.flowEnabled = refs.propEdgeFlowEnabled.checked;
+      });
+    });
+
+    refs.propEdgeFlowSpeed.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        edge.style.flowSpeed = clamp(Number(refs.propEdgeFlowSpeed.value) || 4, 1, 10);
+      });
+    });
+
+    refs.propEdgeFlowDirection.addEventListener("change", () => {
+      mutateSelectedEdge((edge) => {
+        edge.style.flowDirection = normalizeEdgeFlowDirection(refs.propEdgeFlowDirection.value);
       });
     });
   }
 
   function bindCanvasEvents() {
     refs.canvas.addEventListener("pointerdown", onPointerDown);
+    refs.canvas.addEventListener("contextmenu", onCanvasContextMenu);
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onPointerUp);
 
@@ -4663,6 +6226,57 @@
       },
       { passive: false }
     );
+
+    document.addEventListener(
+      "pointerdown",
+      (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) {
+          hideEdgeContextMenu();
+          return;
+        }
+        if (target.closest("#edgeContextMenu")) {
+          return;
+        }
+        hideEdgeContextMenu();
+      },
+      true
+    );
+
+    if (refs.edgeContextMenu) {
+      refs.edgeContextMenu.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) {
+          return;
+        }
+        const button = target.closest("button[data-edge-action]");
+        if (!button) {
+          return;
+        }
+        const action = button.getAttribute("data-edge-action");
+        const edgeId = state.contextMenu.edgeId || state.selectedEdgeId;
+        if (!edgeId) {
+          hideEdgeContextMenu();
+          return;
+        }
+        if (action === "add-waypoint") {
+          addWaypointToEdge(edgeId, state.contextMenu.worldPoint);
+        } else if (action === "delete-waypoint") {
+          deleteWaypointFromEdge(edgeId, state.contextMenu.waypointIndex, state.contextMenu.worldPoint);
+        } else if (action === "reverse-edge") {
+          reverseEdge(edgeId);
+        } else if (action === "edit-label") {
+          editEdgeLabel(edgeId);
+        } else if (action === "copy-style") {
+          copyEdgeStyle(edgeId);
+        } else if (action === "paste-style") {
+          pasteEdgeStyle(edgeId);
+        } else if (action === "set-default-style") {
+          setDefaultConnectorStyleFromEdge(edgeId);
+        }
+        hideEdgeContextMenu();
+      });
+    }
   }
 
   function bindQuickAddEvents() {
@@ -4759,11 +6373,18 @@
         return;
       }
 
-      if (!isInputTarget && event.key === "Escape" && state.ui.quickAdd.open) {
-        event.preventDefault();
-        closeQuickPalette();
-        Renderer.requestRender();
-        return;
+      if (!isInputTarget && event.key === "Escape") {
+        if (state.ui.quickAdd.open) {
+          event.preventDefault();
+          closeQuickPalette();
+          Renderer.requestRender();
+          return;
+        }
+        if (refs.edgeContextMenu && !refs.edgeContextMenu.hidden) {
+          event.preventDefault();
+          hideEdgeContextMenu();
+          return;
+        }
       }
 
       if (!isInputTarget && event.key === "Delete") {

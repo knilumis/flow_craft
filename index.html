@@ -92,6 +92,7 @@
             <button class="shape-btn" data-add-shape="silindir" title="Silindir (Veritabanı)"><span>(DB)</span> DB</button>
             <button class="shape-btn" data-add-shape="belge"><span>[DOC]</span> Belge</button>
             <button class="shape-btn" data-add-shape="not"><span>[!]</span> Not</button>
+            <button class="shape-btn" data-add-shape="junction" title="Junction"><span>(•)</span> Junction</button>
           </div>
         </section>
 
@@ -210,48 +211,211 @@
           <section id="baglantiOzellikleri" class="props-section" hidden>
             <h3>Bağlantı</h3>
 
+            <h4>Bağlantı Türü</h4>
             <div class="inline-grid">
-              <label>Çizgi Rengi
+              <label>Rota
+                <select id="propEdgeRoute">
+                  <option value="straight">Straight (Düz)</option>
+                  <option value="orthogonal">Orthogonal (Dik Açılı)</option>
+                  <option value="isometric">Isometric (45°)</option>
+                  <option value="curved">Curved (Eğri)</option>
+                  <option value="simple">Simple (Basit)</option>
+                  <option value="entityRelation">Entity Relation</option>
+                </select>
+              </label>
+              <label>Köşe
+                <select id="propEdgeCornerStyle">
+                  <option value="sharp">Sharp</option>
+                  <option value="rounded">Rounded</option>
+                  <option value="curved">Curved</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="inline-grid">
+              <label>Köşe Radius
+                <input id="propEdgeCornerRadius" type="number" min="0" max="80" step="1" />
+              </label>
+              <label>Uç Davranışı
+                <select id="propEdgeEndpointMode">
+                  <option value="floating">Floating</option>
+                  <option value="fixed">Fixed</option>
+                </select>
+              </label>
+            </div>
+            <label class="single-check"><input id="propEdgeSnapRouting" type="checkbox" /> Rota Izgaraya Yapışsın</label>
+
+            <h4>Çizgi</h4>
+            <div class="inline-grid">
+              <label>Renk
                 <input id="propEdgeStroke" type="color" />
               </label>
               <label>Kalınlık
-                <input id="propEdgeStrokeWidth" type="number" min="1" max="12" step="1" />
+                <input id="propEdgeStrokeWidth" type="number" min="1" max="20" step="1" />
               </label>
             </div>
-
-            <div class="inline-grid checks">
-              <label><input id="propEdgeDashed" type="checkbox" /> Kesikli</label>
-              <label><input id="propEdgeArrow" type="checkbox" /> Ok</label>
-            </div>
-
             <div class="inline-grid">
-              <label>Çizgi Tipi
-                <select id="propEdgeType">
-                  <option value="orthogonal">Ortogonal</option>
-                  <option value="straight">Düz</option>
-                  <option value="curved">Eğri</option>
+              <label>Stil
+                <select id="propEdgePattern">
+                  <option value="solid">Düz</option>
+                  <option value="dashed">Kesikli</option>
+                  <option value="dotted">Noktalı</option>
                 </select>
               </label>
-              <label>Köşe Yuvarlama
-                <input id="propEdgeCornerRadius" type="number" min="0" max="60" step="1" />
+              <label>Opaklık
+                <input id="propEdgeOpacity" type="number" min="0" max="1" step="0.05" />
+              </label>
+            </div>
+            <div class="inline-grid">
+              <label>Dash Uzunluğu
+                <input id="propEdgeDashLength" type="number" min="1" max="40" step="1" />
+              </label>
+              <label>Gap Uzunluğu
+                <input id="propEdgeGapLength" type="number" min="1" max="40" step="1" />
+              </label>
+            </div>
+            <div class="inline-grid checks">
+              <label><input id="propEdgeShadow" type="checkbox" /> Gölge</label>
+              <label><input id="propEdgeSketch" type="checkbox" /> Sketch</label>
+            </div>
+
+            <h4>Oklar</h4>
+            <div class="inline-grid">
+              <label>Baş Ucu
+                <select id="propEdgeStartArrow">
+                  <option value="none">Yok</option>
+                  <option value="classic">Classic</option>
+                  <option value="block">Block</option>
+                  <option value="open">Open</option>
+                  <option value="oval">Oval</option>
+                  <option value="diamond">Diamond</option>
+                </select>
+              </label>
+              <label>Son Ucu
+                <select id="propEdgeEndArrow">
+                  <option value="none">Yok</option>
+                  <option value="classic">Classic</option>
+                  <option value="block">Block</option>
+                  <option value="open">Open</option>
+                  <option value="oval">Oval</option>
+                  <option value="diamond">Diamond</option>
+                </select>
+              </label>
+            </div>
+            <div class="inline-grid">
+              <label>Baş Boyutu
+                <input id="propEdgeStartSize" type="number" min="4" max="48" step="1" />
+              </label>
+              <label>Son Boyutu
+                <input id="propEdgeEndSize" type="number" min="4" max="48" step="1" />
+              </label>
+            </div>
+            <div class="inline-grid">
+              <label>Baş Mesafesi
+                <input id="propEdgeStartSpacing" type="number" min="-40" max="40" step="1" />
+              </label>
+              <label>Son Mesafesi
+                <input id="propEdgeEndSpacing" type="number" min="-40" max="40" step="1" />
+              </label>
+            </div>
+            <label class="single-check"><input id="propEdgeArrowFill" type="checkbox" /> Dolu Ok Ucu</label>
+
+            <h4>Kesişim</h4>
+            <div class="inline-grid">
+              <label>Line Jumps
+                <select id="propEdgeJumpStyle">
+                  <option value="none">Yok</option>
+                  <option value="arc">Yay</option>
+                  <option value="gap">Boşluk</option>
+                  <option value="sharp">Keskin</option>
+                </select>
+              </label>
+              <label>Jump Boyutu
+                <input id="propEdgeJumpSize" type="number" min="2" max="40" step="1" />
               </label>
             </div>
 
-            <div class="hint edge-hint">
-              Seçili bağlantının ortasındaki tutamacı sürükleyerek çizgiyi hareket ettirebilirsiniz.
-            </div>
-
-            <label>Etiket
+            <h4>Etiket</h4>
+            <label>Metin
               <input id="propEdgeLabel" type="text" />
             </label>
-
             <div class="inline-grid">
-              <label>Etiket Boyutu
-                <input id="propEdgeLabelSize" type="number" min="8" max="40" step="1" />
+              <label>Konum (%)
+                <input id="propEdgeLabelPosition" type="number" min="0" max="100" step="1" />
               </label>
-              <label>Etiket Rengi
+              <label>Yazı Boyutu
+                <input id="propEdgeLabelSize" type="number" min="8" max="48" step="1" />
+              </label>
+            </div>
+            <div class="inline-grid">
+              <label>Offset X
+                <input id="propEdgeLabelOffsetX" type="number" min="-200" max="200" step="1" />
+              </label>
+              <label>Offset Y
+                <input id="propEdgeLabelOffsetY" type="number" min="-200" max="200" step="1" />
+              </label>
+            </div>
+            <div class="inline-grid">
+              <label>Yazı Tipi
+                <select id="propEdgeLabelFontFamily">
+                  <option>Arial</option>
+                  <option>Verdana</option>
+                  <option>Georgia</option>
+                  <option>Tahoma</option>
+                  <option>Courier New</option>
+                </select>
+              </label>
+              <label>Yazı Rengi
                 <input id="propEdgeLabelColor" type="color" />
               </label>
+            </div>
+            <div class="inline-grid checks">
+              <label><input id="propEdgeLabelBold" type="checkbox" /> Kalın</label>
+              <label><input id="propEdgeLabelItalic" type="checkbox" /> İtalik</label>
+            </div>
+            <div class="inline-grid checks">
+              <label><input id="propEdgeLabelUnderline" type="checkbox" /> Altı Çizili</label>
+              <label>Hiza
+                <select id="propEdgeLabelAlign">
+                  <option value="left">Sol</option>
+                  <option value="center">Orta</option>
+                  <option value="right">Sağ</option>
+                </select>
+              </label>
+            </div>
+            <div class="inline-grid">
+              <label>Arka Plan
+                <input id="propEdgeLabelBackground" type="color" />
+              </label>
+              <label>Çerçeve
+                <input id="propEdgeLabelBorder" type="color" />
+              </label>
+            </div>
+            <div class="inline-grid">
+              <label>Çerçeve Kalınlığı
+                <input id="propEdgeLabelBorderWidth" type="number" min="0" max="10" step="1" />
+              </label>
+              <label>Padding
+                <input id="propEdgeLabelPadding" type="number" min="0" max="24" step="1" />
+              </label>
+            </div>
+
+            <h4>Animasyon</h4>
+            <div class="inline-grid checks">
+              <label><input id="propEdgeFlowEnabled" type="checkbox" /> Akış Animasyonu</label>
+              <label>Yön
+                <select id="propEdgeFlowDirection">
+                  <option value="forward">İleri</option>
+                  <option value="backward">Geri</option>
+                </select>
+              </label>
+            </div>
+            <label>Hız (1-10)
+              <input id="propEdgeFlowSpeed" type="number" min="1" max="10" step="1" />
+            </label>
+
+            <div class="hint edge-hint">
+              Waypoint için bağlantıya sağ tıklayın. Endpoint veya waypoint tutamaçlarını sürükleyerek rotayı manuel düzenleyin.
             </div>
           </section>
         </section>
@@ -259,6 +423,15 @@
     </main>
 
     <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+    <div id="edgeContextMenu" class="context-menu" hidden>
+      <button type="button" data-edge-action="add-waypoint">Waypoint Ekle</button>
+      <button type="button" data-edge-action="delete-waypoint">Waypoint Sil</button>
+      <button type="button" data-edge-action="reverse-edge">Bağlantıyı Ters Çevir</button>
+      <button type="button" data-edge-action="edit-label">Etiket Ekle / Etiketi Düzenle</button>
+      <button type="button" data-edge-action="copy-style">Stili Kopyala</button>
+      <button type="button" data-edge-action="paste-style">Stili Yapıştır</button>
+      <button type="button" data-edge-action="set-default-style">Varsayılan Bağlantı Stili Yap</button>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/svg2pdf.js@2.2.4/dist/svg2pdf.umd.min.js"></script>

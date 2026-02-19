@@ -408,6 +408,11 @@ button[data-active="1"] {
   vector-effect: non-scaling-stroke;
 }
 
+.edge-path.edge-shadow {
+  stroke: rgba(2, 8, 23, 0.2);
+  transform: translate(2px, 2px);
+}
+
 .edge.selected .edge-path {
   stroke: var(--brand) !important;
 }
@@ -433,6 +438,14 @@ button[data-active="1"] {
   stroke-width: 1.8;
   vector-effect: non-scaling-stroke;
   cursor: pointer;
+}
+
+.edge-waypoint-handle {
+  fill: #dbeafe;
+  stroke: var(--brand);
+  stroke-width: 1.8;
+  vector-effect: non-scaling-stroke;
+  cursor: move;
 }
 
 .edge-control-handle {
@@ -631,6 +644,15 @@ body.dragging-edge-handle .edge-control-handle {
   margin-bottom: 8px;
 }
 
+.props-section h4 {
+  margin: 8px 0 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
 .props-section {
   margin-top: 10px;
   border: 1px solid var(--panel-border);
@@ -688,6 +710,59 @@ body.dragging-edge-handle .edge-control-handle {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.single-check {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+}
+
+.single-check input {
+  margin: 0;
+}
+
+.context-menu {
+  position: fixed;
+  z-index: 12000;
+  min-width: 220px;
+  border-radius: 10px;
+  border: 1px solid var(--panel-border);
+  background: var(--panel);
+  box-shadow: 0 18px 35px rgba(2, 8, 23, 0.35);
+  padding: 6px;
+}
+
+.context-menu button {
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  text-align: left;
+  padding: 8px 9px;
+  font-size: 11px;
+  background: transparent;
+  color: var(--text);
+}
+
+.context-menu button:hover {
+  background: rgba(20, 184, 166, 0.12);
+}
+
+.edge-flow-overlay {
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+  animation-name: edgeFlowDash;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+@keyframes edgeFlowDash {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -40;
+  }
 }
 
 .toast-container {
